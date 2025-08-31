@@ -2,11 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>AstroMiner — Zero-G Space Mining (clean-room)</title>
+<title>AstroMiner — Space Mining (fat beams + photon torpedoes)</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   html,body{height:100%;margin:0;background:#000;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#eef}
   #app{position:fixed;inset:0;overflow:hidden}
+
   .hud{position:absolute;left:10px;top:10px;background:rgba(0,0,0,.45);padding:10px 12px;border-radius:12px;font-size:12px;backdrop-filter:blur(2px);line-height:1.25}
   .shop{position:absolute;right:10px;top:10px;background:rgba(0,0,0,.55);padding:10px 12px;border-radius:12px;min-width:260px;max-width:340px;font-size:12px}
   .shop h3{margin:0 0 6px;font-size:13px}
@@ -21,6 +22,15 @@
   .help{position:absolute;left:10px;bottom:10px;background:rgba(0,0,0,.45);padding:8px 10px;border-radius:10px;font-size:12px;max-width:520px}
   .toast{position:absolute;left:50%;transform:translateX(-50%);top:10px;background:rgba(0,0,0,.5);padding:6px 10px;border-radius:10px;font-size:12px;display:none}
   .err{position:absolute;right:10px;bottom:10px;background:#300;color:#fee;padding:8px 10px;border-radius:10px;max-width:60ch;display:none;white-space:pre-wrap}
+
+  /* Targeting reticle (center) */
+  .ret{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;opacity:.9}
+  .ret .ring{width:46px;height:46px;border:2px solid rgba(173,216,255,.9);border-radius:50%;box-shadow:0 0 18px rgba(120,180,255,.55) inset,0 0 22px rgba(120,180,255,.35)}
+  .ret .lines{position:absolute;left:0;top:0;width:46px;height:46px}
+  .ret .lines::before,.ret .lines::after{content:"";position:absolute;background:rgba(173,216,255,.9)}
+  .ret .lines::before{left:50%;top:-10px;transform:translateX(-50%);width:2px;height:12px;box-shadow:0 44px 0 0 rgba(173,216,255,.9)}
+  .ret .lines::after{top:50%;left:-10px;transform:translateY(-50%);height:2px;width:12px;box-shadow:44px 0 0 0 rgba(173,216,255,.9)}
+
 </style>
 </head>
 <body>
@@ -57,6 +67,9 @@
   <div>Brake/Damp: <b>Z</b> · Laser: <b>Space</b> · Missile: <b>X</b></div>
 </div>
 
+<!-- Targeting reticle -->
+<div class="ret"><div class="ring"></div><div class="lines"></div></div>
+
 <div class="toast" id="toast"></div>
 <div class="err" id="err"></div>
 
@@ -75,7 +88,7 @@ function rng(seed){ let s=seed>>>0; return ()=>{ s+=0x6D2B79F5; let t=Math.imul(
 /////////////////////
 const app=document.getElementById('app');
 const scene=new THREE.Scene();
-const camera=new THREE.PerspectiveCamera(75,1,0.1,200000);
+const camera=new THREE.PerspectiveCamera(75,1,0.1,220000);
 camera.position.set(0,0,12);
 
 const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});
@@ -92,7 +105,7 @@ scene.add(sun);
 /////////////////////
 // Starfield & Sky //
 /////////////////////
-function makeStarfield(seed,count,spread=55000){
+function makeStarfield(seed,count,spread=60000){
   const R=rng(seed);
   const geo=new THREE.BufferGeometry();
   const pos=new Float32Array(count*3);
@@ -183,14 +196,14 @@ const ship={
   pos:new THREE.Vector3(0,0,0),
   vel:new THREE.Vector3(),
   quat:new THREE.Quaternion(),
-  // base stats
-  thrust:28, strafe:22, lift:22,
-  yawRate:rad(85), pitchRate:rad(85), rollRate:rad(140),
-  dampingLin:0.08, maxSpeed:220, range:3000,
+  // bumped speeds/turn a bit
+  thrust:36, strafe:28, lift:28,
+  yawRate:rad(100), pitchRate:rad(100), rollRate:rad(180),
+  dampingLin:0.06, maxSpeed:280, range:3600,
   cargo:0, cargoCap:100, credits:0,
   // weapons & heat
-  laser:{ canFire:true, heat:0, over:false, cooldown:28, shotHeat:18, dmg:40, rof:7, _cd:0 },
-  missile:{ canFire:true, heat:0, over:false, cooldown:16, shotHeat:34, dmg:220, reload:0.9, _cd:0 }
+  laser:{ canFire:true, heat:0, over:false, cooldown:30, shotHeat:18, dmg:40, rof:10, _cd:0 },
+  missile:{ canFire:true, heat:0, over:false, cooldown:18, shotHeat:34, dmg:220, reload:0.7, _cd:0 }
 };
 
 //////////////////////
@@ -224,10 +237,10 @@ function tryBuy(kind){
   if (ship.credits < cost){ toast('Not enough credits'); return; }
   ship.credits -= cost;
   if (kind==='laserD'){ upgrades.laserD++; ship.laser.dmg = 40 + (upgrades.laserD-1)*18; }
-  if (kind==='laserC'){ upgrades.laserC++; ship.laser.cooldown = 28 + (upgrades.laserC-1)*6; ship.laser.shotHeat = Math.max(8, 18 - (upgrades.laserC-1)*2); }
+  if (kind==='laserC'){ upgrades.laserC++; ship.laser.cooldown = 30 + (upgrades.laserC-1)*6; ship.laser.shotHeat = Math.max(8, 18 - (upgrades.laserC-1)*2); }
   if (kind==='missD'){ upgrades.missD++; ship.missile.dmg = 220 + (upgrades.missD-1)*80; }
-  if (kind==='thrust'){ upgrades.thrust++; ship.thrust = 28 + (upgrades.thrust-1)*6; ship.strafe = 22 + (upgrades.thrust-1)*5; ship.lift = 22 + (upgrades.thrust-1)*5; ship.maxSpeed = 220 + (upgrades.thrust-1)*20; }
-  if (kind==='turn'){ upgrades.turn++; ship.yawRate=rad(85 + (upgrades.turn-1)*10); ship.pitchRate=rad(85 + (upgrades.turn-1)*10); ship.rollRate=rad(140 + (upgrades.turn-1)*16); }
+  if (kind==='thrust'){ upgrades.thrust++; ship.thrust = 36 + (upgrades.thrust-1)*6; ship.strafe = 28 + (upgrades.thrust-1)*5; ship.lift = 28 + (upgrades.thrust-1)*5; ship.maxSpeed = 280 + (upgrades.thrust-1)*20; }
+  if (kind==='turn'){ upgrades.turn++; ship.yawRate=rad(100 + (upgrades.turn-1)*10); ship.pitchRate=rad(100 + (upgrades.turn-1)*10); ship.rollRate=rad(180 + (upgrades.turn-1)*18); }
   if (kind==='magnet'){ upgrades.magnet++; ship.cargoCap = 100 + (upgrades.magnet-1)*50; }
   refreshShop(); updateUI(); toast('Purchased '+kind.toUpperCase()+' Lv'+(nextLv)); save();
 }
@@ -260,8 +273,8 @@ let quality='high';
 let seed=(Math.random()*1e9)|0;
 const AST={ inst:[], data:[], count:0, geo:[], mat:null };
 const DROPS={ inst:null, data:[], count:0, geo:null, mat:null };
-const MISSILES=[];
-const LASER_BEAMS=[];
+const MISSILES=[]; // {pos,vel,life,mesh,trailT}
+const LASER_BEAMS=[]; // {mesh, outer, startGlow, endGlow, t, life}
 
 function setQuality(q){ quality=q; ui.qual.textContent=q==='ultra'?'Ultra':'High'; buildWorld(seed); }
 function newSeed(){ seed = (seed*1664525 + 1013904223)>>>0; buildWorld(seed); }
@@ -375,9 +388,22 @@ function destroyAsteroid(rec){
 /////////////////////
 const FX={ group:new THREE.Group() };
 scene.add(FX.group);
+
+function makeGlowTexture(size=96, inner=0.0, outer=1.0, col='rgba(130,200,255,1)'){
+  const c=document.createElement('canvas'); c.width=c.height=size;
+  const x=c.getContext('2d');
+  const g=x.createRadialGradient(size/2,size/2,size*inner, size/2,size/2,size*outer);
+  g.addColorStop(0, col);
+  g.addColorStop(1, 'rgba(130,200,255,0)');
+  x.fillStyle=g; x.fillRect(0,0,size,size);
+  const t=new THREE.CanvasTexture(c); t.anisotropy=4; return t;
+}
+const glowTexBlue = makeGlowTexture(128, 0.0, 0.5, 'rgba(130,200,255,1)');
+const glowTexOrange= makeGlowTexture(128, 0.0, 0.5, 'rgba(255,180,80,1)');
+
 function spawnExplosion(pos,scale){
   const g=new THREE.SphereGeometry(1, 8, 6);
-  const m=new THREE.MeshBasicMaterial({color:0xffaa55, transparent:true, opacity:0.9});
+  const m=new THREE.MeshBasicMaterial({color:0xffaa55, transparent:true, opacity:0.9, blending:THREE.AdditiveBlending, depthWrite:false});
   const s=new THREE.Mesh(g,m);
   s.position.copy(pos);
   s.scale.setScalar(0.5);
@@ -385,8 +411,71 @@ function spawnExplosion(pos,scale){
   FX.group.add(s);
 }
 
+///////////////////////////////
+// BIG Laser Beam + Sprites  //
+///////////////////////////////
+function createLaserBeam(start,end){
+  const dir = end.clone().sub(start);
+  const len = Math.max(0.001, dir.length());
+  const mid = start.clone().addScaledVector(dir, 0.5);
+  const dirN = dir.clone().normalize();
+
+  // inner bright core (fat cylinder)
+  const rCore = 1.2; // thickness — tweak here
+  const gCore = new THREE.CylinderGeometry(rCore, rCore, len, 18, 1, true);
+  const mCore = new THREE.MeshBasicMaterial({color:0x88ccff, transparent:true, opacity:0.95, blending:THREE.AdditiveBlending, depthWrite:false});
+  const core  = new THREE.Mesh(gCore, mCore);
+  // outer soft glow
+  const rGlow = 2.4;
+  const gGlow = new THREE.CylinderGeometry(rGlow, rGlow, len, 18, 1, true);
+  const mGlow = new THREE.MeshBasicMaterial({color:0x66aaff, transparent:true, opacity:0.35, blending:THREE.AdditiveBlending, depthWrite:false});
+  const glow  = new THREE.Mesh(gGlow, mGlow);
+
+  const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), dirN);
+  core.position.copy(mid); core.quaternion.copy(q);
+  glow.position.copy(mid); glow.quaternion.copy(q);
+
+  // start/end flares
+  const startSprite=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexBlue, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, opacity:0.9}));
+  const endSprite  =new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexBlue, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, opacity:0.9}));
+  startSprite.position.copy(start); startSprite.scale.set(6,6,1);
+  endSprite.position.copy(end);     endSprite.scale.set(8,8,1);
+
+  scene.add(core); scene.add(glow); scene.add(startSprite); scene.add(endSprite);
+
+  return { mesh:core, outer:glow, startGlow:startSprite, endGlow:endSprite, t:0, life:0.09 };
+}
+function removeBeam(b){
+  scene.remove(b.mesh); scene.remove(b.outer);
+  scene.remove(b.startGlow); scene.remove(b.endGlow);
+  b.mesh.geometry.dispose(); b.mesh.material.dispose();
+  b.outer.geometry.dispose(); b.outer.material.dispose();
+  b.startGlow.material.map.dispose(); b.startGlow.material.dispose();
+  b.endGlow.material.map.dispose(); b.endGlow.material.dispose();
+}
+
+/////////////////////////////
+// Photon Torpedo Missiles //
+/////////////////////////////
+function spawnMissile(){
+  const fwd=new THREE.Vector3(0,0,-1).applyQuaternion(ship.quat);
+  const pos=ship.pos.clone().add(fwd.clone().multiplyScalar(2));
+
+  // bright core + glow sprite
+  const core=new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 10),
+                            new THREE.MeshBasicMaterial({color:0xffcc88, transparent:true, opacity:1, blending:THREE.AdditiveBlending, depthWrite:false}));
+  const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexOrange, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, opacity:0.9}));
+  glow.scale.set(6,6,1);
+  const group=new THREE.Group(); group.add(glow); group.add(core);
+  group.position.copy(pos);
+  scene.add(group);
+
+  const m={ pos, vel:fwd.clone().multiplyScalar(160), life:10, mesh:group, trailT:0 };
+  MISSILES.push(m);
+}
+
 /////////////////////////
-// Weapons & Projectiles
+// Weapons & Firing    //
 /////////////////////////
 function fireLaser(){
   const L=ship.laser;
@@ -394,6 +483,7 @@ function fireLaser(){
   L.heat += L.shotHeat;
   if (L.heat>=100){ L.over=true; toast('Laser overheated!'); }
   L._cd = 1/Math.max(3, ship.laser.rof);
+
   const fwd=new THREE.Vector3(0,0,-1).applyQuaternion(ship.quat);
   const start=ship.pos.clone().add(fwd.clone().multiplyScalar(2));
   const range=ship.range;
@@ -407,11 +497,15 @@ function fireLaser(){
     const perp2 = v.lengthSq() - t*t;
     if (perp2 <= (a.size*a.size)){ if (t<bestT){ best=a; bestT=t; } }
   }
-  const beamGeom=new THREE.BufferGeometry().setFromPoints([start, start.clone().add(fwd.clone().multiplyScalar(best?bestT:range))]);
-  const beamMat=new THREE.LineBasicMaterial({color:0x66aaff, transparent:true, opacity:0.9});
-  const beam=new THREE.Line(beamGeom,beamMat); beam.userData.t=0; beam.userData.life=0.08;
-  LASER_BEAMS.push(beam); scene.add(beam);
-  if (best){ best.hp -= ship.laser.dmg; if (best.hp<=0){ destroyAsteroid(best); } }
+  const end = start.clone().add(fwd.clone().multiplyScalar(best?bestT:range));
+  const beam=createLaserBeam(start,end);
+  LASER_BEAMS.push(beam);
+
+  if (best){
+    best.hp -= ship.laser.dmg;
+    if (best.hp<=0){ destroyAsteroid(best); }
+    // impact flash already handled via beam end sprite
+  }
 }
 function fireMissile(){
   const M=ship.missile;
@@ -419,9 +513,7 @@ function fireMissile(){
   M.heat += M.shotHeat;
   if (M.heat>=100){ M.over=true; toast('Missiles overheated!'); }
   M._cd = M.reload;
-  const fwd=new THREE.Vector3(0,0,-1).applyQuaternion(ship.quat);
-  const m={ pos:ship.pos.clone().add(fwd.clone().multiplyScalar(2)), vel:fwd.clone().multiplyScalar(120), life:8 };
-  MISSILES.push(m);
+  spawnMissile();
 }
 
 //////////////////////
@@ -429,14 +521,17 @@ function fireMissile(){
 //////////////////////
 let stars, planetA, planetB;
 function buildWorld(s){
-  // clear FX/projectiles/drops
-  for(const b of LASER_BEAMS){ scene.remove(b); }
-  LASER_BEAMS.length=0; MISSILES.length=0;
+  // clear beams/missiles/drops/fx
+  for(const b of LASER_BEAMS){ removeBeam(b); } LASER_BEAMS.length=0;
+  for (let i=MISSILES.length-1;i>=0;i--){ scene.remove(MISSILES[i].mesh); } MISSILES.length=0;
+  for (let i=FX.group.children.length-1;i>=0;i--){ const n=FX.group.children[i]; FX.group.remove(n); n.geometry?.dispose?.(); n.material?.dispose?.(); }
+
   resetDrops(); buildAsteroids(s);
-  if (stars) scene.remove(stars); stars=makeStarfield(s^0x1234, 5000, 55000); scene.add(stars);
+  if (stars) scene.remove(stars); stars=makeStarfield(s^0x1234, 6000, 60000); scene.add(stars);
   if (planetA) scene.remove(planetA); if (planetB) scene.remove(planetB);
   planetA=makePlanet(4200, 70000, 0x1f2a7a); scene.add(planetA);
   planetB=makePlanet(2600,110000, 0x7a3f1f); scene.add(planetB);
+
   // ship reset
   ship.pos.set(0,0,0); ship.vel.set(0,0,0); ship.quat.identity();
   ship.laser.heat=0; ship.laser.over=false; ship.laser._cd=0;
@@ -457,17 +552,18 @@ function load(){
     if (d.seed) seed=d.seed; if (d.quality) quality=d.quality;
     if (d.credits!=null) ship.credits=d.credits; if (d.cargo!=null) ship.cargo=d.cargo;
     if (d.upgrades) Object.assign(upgrades,d.upgrades);
+    // reapply
     ship.laser.dmg = 40 + (upgrades.laserD-1)*18;
-    ship.laser.cooldown = 28 + (upgrades.laserC-1)*6;
+    ship.laser.cooldown = 30 + (upgrades.laserC-1)*6;
     ship.laser.shotHeat = Math.max(8, 18 - (upgrades.laserC-1)*2);
     ship.missile.dmg = 220 + (upgrades.missD-1)*80;
-    ship.thrust = 28 + (upgrades.thrust-1)*6;
-    ship.strafe = 22 + (upgrades.thrust-1)*5;
-    ship.lift   = 22 + (upgrades.thrust-1)*5;
-    ship.maxSpeed = 220 + (upgrades.thrust-1)*20;
-    ship.yawRate=rad(85 + (upgrades.turn-1)*10);
-    ship.pitchRate=rad(85 + (upgrades.turn-1)*10);
-    ship.rollRate=rad(140 + (upgrades.turn-1)*16);
+    ship.thrust = 36 + (upgrades.thrust-1)*6;
+    ship.strafe = 28 + (upgrades.thrust-1)*5;
+    ship.lift   = 28 + (upgrades.thrust-1)*5;
+    ship.maxSpeed = 280 + (upgrades.thrust-1)*20;
+    ship.yawRate=rad(100 + (upgrades.turn-1)*10);
+    ship.pitchRate=rad(100 + (upgrades.turn-1)*10);
+    ship.rollRate=rad(180 + (upgrades.turn-1)*18);
     ship.cargoCap = 100 + (upgrades.magnet-1)*50;
   }catch(e){ console.warn('save load failed',e); }
 }
@@ -514,7 +610,7 @@ function handleInput(dt){
 
   // dampers
   if (keys['KeyZ']) { ship.vel.multiplyScalar(Math.pow(1-0.9, dt*60)); } // strong brake
-  else { ship.vel.multiplyScalar(1 - 0.08*dt); }
+  else { ship.vel.multiplyScalar(1 - ship.dampingLin*dt); }
 
   const spd=ship.vel.length(); if (spd>ship.maxSpeed) ship.vel.multiplyScalar(ship.maxSpeed/spd);
 
@@ -522,55 +618,77 @@ function handleInput(dt){
   if (keys['Space']) fireLaser();
   if (keys['KeyX'])  fireMissile();
 }
+
 function updateWeapons(dt){
+  // lasers
   const L=ship.laser;
   L._cd=Math.max(0, L._cd - dt);
   L.heat = Math.max(0, L.heat - L.cooldown*dt);
   if (L.over && L.heat <= 35){ L.over=false; toast('Laser ready'); }
+
+  // missiles
   const M=ship.missile;
   M._cd=Math.max(0, M._cd - dt);
   M.heat = Math.max(0, M.heat - M.cooldown*dt);
   if (M.over && M.heat <= 35){ M.over=false; toast('Missiles ready'); }
 
-  // beams VFX
+  // beams fade
   for (let i=LASER_BEAMS.length-1;i>=0;i--){
-    const b=LASER_BEAMS[i]; b.userData.t+=dt;
-    b.material.opacity = Math.max(0, 0.9*(1 - b.userData.t/b.userData.life));
-    if (b.userData.t>=b.userData.life){ scene.remove(b); LASER_BEAMS.splice(i,1); }
+    const b=LASER_BEAMS[i]; b.t+=dt;
+    const k=Math.max(0, 1 - b.t/b.life);
+    b.mesh.material.opacity = 0.95*k;
+    b.outer.material.opacity= 0.35*k;
+    b.startGlow.material.opacity = 0.9*k;
+    b.endGlow.material.opacity   = 0.9*k;
+    if (b.t>=b.life){ removeBeam(b); LASER_BEAMS.splice(i,1); }
   }
 
-  // missiles update
+  // missiles update (bright torpedoes + trails + light homing)
   for (let i=MISSILES.length-1;i>=0;i--){
     const m=MISSILES[i];
-    // light homing to nearest rock
+    // target nearest
     let nearest=null, nd=Infinity;
     for (let j=0;j<AST.data.length;j++){
       const a=AST.data[j]; if(!a.alive) continue;
       const d=Math.hypot(m.pos.x-a.x, m.pos.y-a.y, m.pos.z-a.z);
       if (d<nd){ nd=d; nearest=a; }
     }
-    if (nearest && nd<1200){
+    if (nearest && nd<1400){
       const aim=new THREE.Vector3(nearest.x,nearest.y,nearest.z).sub(m.pos).normalize();
-      m.vel.lerp(aim.multiplyScalar(140), 0.015);
+      m.vel.lerp(aim.multiplyScalar(180), 0.02);
     }
     m.pos.addScaledVector(m.vel, dt);
+    m.mesh.position.copy(m.pos);
     m.life-=dt;
+
+    // trail
+    m.trailT += dt;
+    if (m.trailT>0.03){
+      m.trailT=0;
+      const s=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexOrange, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, opacity:0.8}));
+      s.position.copy(m.pos); s.scale.set(4.2,4.2,1);
+      s.userData.t=0; s.userData.life=0.35;
+      FX.group.add(s);
+    }
+
     // collision
     let hit=null;
     for (let j=0;j<AST.data.length;j++){
       const a=AST.data[j]; if(!a.alive) continue;
       const dx=m.pos.x-a.x, dy=m.pos.y-a.y, dz=m.pos.z-a.z;
-      const r=a.size*1.05;
+      const r=a.size*1.1;
       if (dx*dx+dy*dy+dz*dz <= r*r){ hit=a; break; }
     }
     if (hit){
       hit.hp -= ship.missile.dmg;
       if (hit.hp<=0) destroyAsteroid(hit);
-      spawnExplosion(m.pos, 2.0);
+      spawnExplosion(m.pos, 2.2);
+      scene.remove(m.mesh);
       MISSILES.splice(i,1);
-    } else if (m.life<=0){ MISSILES.splice(i,1); }
+    } else if (m.life<=0){ scene.remove(m.mesh); MISSILES.splice(i,1); }
   }
 }
+
 function updateDrops(dt){
   const magnet = 12 + (upgrades.magnet-1)*6;
   for (let i=0;i<DROPS.count;i++){
@@ -597,11 +715,17 @@ function updateDrops(dt){
 }
 function updateFX(dt){
   for (let i=FX.group.children.length-1;i>=0;i--){
-    const s=FX.group.children[i]; s.userData.t+=dt;
+    const s=FX.group.children[i];
+    s.userData.t+=dt;
     const t=s.userData.t/s.userData.life;
-    s.scale.setScalar(THREE.MathUtils.lerp(0.5, s.userData.scale, t));
-    s.material.opacity = 0.9*(1-t);
-    if (s.userData.t>=s.userData.life){ FX.group.remove(s); s.geometry.dispose(); s.material.dispose(); }
+    if (s.isSprite){
+      s.material.opacity = 0.8*(1-t);
+      s.scale.setScalar(THREE.MathUtils.lerp(4.2, 2.0, t));
+    } else {
+      s.scale.setScalar(THREE.MathUtils.lerp(0.5, s.userData.scale, t));
+      s.material.opacity = 0.9*(1-t);
+    }
+    if (s.userData.t>=s.userData.life){ FX.group.remove(s); s.material.map?.dispose?.(); s.material.dispose(); s.geometry?.dispose?.(); }
   }
 }
 
@@ -614,13 +738,13 @@ function loop(){
   updateFX(dt);
 
   // camera follow
-  const camOffset=new THREE.Vector3(0,0.8,3.6).applyQuaternion(ship.quat);
+  const camOffset=new THREE.Vector3(0,0.9,4.2).applyQuaternion(ship.quat);
   const targetPos = ship.pos.clone().sub(camOffset);
   camera.position.lerp(targetPos, 0.18);
-  const look=ship.pos.clone().add(new THREE.Vector3(0,0,-10).applyQuaternion(ship.quat));
+  const look=ship.pos.clone().add(new THREE.Vector3(0,0,-12).applyQuaternion(ship.quat));
   camera.quaternion.slerp(new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(camera.position, look, new THREE.Vector3(0,1,0))), 0.2);
 
-  // “sun” parallax
+  // sun moves a touch with us for shading parallax
   sun.position.copy(ship.pos).add(new THREE.Vector3(1,0.2,0.3).multiplyScalar(30000));
 
   updateUI();
