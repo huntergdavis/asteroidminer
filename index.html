@@ -175,7 +175,7 @@ function buildShipMesh(){
   const wingR = wingL.clone(); wingR.position.x=1.0; shipGroup.add(wingR);
 }
 buildShipMesh();
-// dual cannon hardpoints close to “top corners” of view (above & outwards)
+// dual cannon hardpoints close to “top corners”
 const HP_LOCAL = {
   laserL: new THREE.Vector3(-0.9, 0.55, -1.6),
   laserR: new THREE.Vector3( 0.9, 0.55, -1.6),
@@ -256,7 +256,6 @@ function addDrops(pos,size){
     {name:'Platinum',val:30,color:0xd9d9ff},
     {name:'Iridium', val:40,color:0xa3d1ff},
   ];
-  // more generous, always visible amounts
   const count=3 + Math.floor(Math.random()*3 + size*0.6);
   for(let i=0;i<count;i++){
     const k=kinds[Math.min(kinds.length-1, Math.floor(Math.random()* (2+size*0.25)))];
@@ -267,7 +266,7 @@ function spawnDrop(pos,value,color){
   if (DROPS.count>=DROPS.cap) return;
   const id=DROPS.count++;
   DROPS.data[id]={ pos:pos.clone(), vel:new THREE.Vector3((Math.random()-0.5)*2,(Math.random()-0.5)*2,(Math.random()-0.5)*2), value, alive:true, color };
-  const m=new THREE.Matrix4(), q=new THREE.Quaternion(), s=new THREE.Vector3(1.4,1.4,1.4); // bigger shards
+  const m=new THREE.Matrix4(), q=new THREE.Quaternion(), s=new THREE.Vector3(1.4,1.4,1.4);
   m.compose(DROPS.data[id].pos,q,s);
   DROPS.inst.setMatrixAt(id,m);
   if (!DROPS.inst.instanceColor){
@@ -311,7 +310,7 @@ function buildAsteroids(seed){
       const a=R()*Math.PI*2, r=beltR + (R()*2-1)*beltW;
       const x=Math.cos(a)*r, z=Math.sin(a)*r, y=(R()*2-1)*beltH;
       const size= 6 + Math.pow(R(),2)*40; // 6..46
-      const hp = Math.round( (size*1.6) + (gi*8) ); // slightly easier to pop
+      const hp = Math.round( (size*1.6) + (gi*8) );
       const rot=new THREE.Quaternion().setFromEuler(new THREE.Euler(R()*Math.PI, R()*Math.PI, R()*Math.PI));
       const scale=new THREE.Vector3(size,size,size);
       const m=new THREE.Matrix4(); m.compose(new THREE.Vector3(x,y,z), rot, scale);
@@ -397,15 +396,13 @@ function createLaserBeam(start,end){
 }
 function updateBeam(b,dt){
   b.t+=dt;
-  const p = Math.min(1, b.t / b.growTime);         // grow along path first
+  const p = Math.min(1, b.t / b.growTime);
   const L = b.len * p;
   const mid = b.start.clone().addScaledVector(b.dir, L*0.5);
   b.mesh.position.copy(mid); b.outer.position.copy(mid);
-  b.mesh.scale.set(1, L, 1); b.outer.scale.set(1, L, 1);  // scale height to current length
+  b.mesh.scale.set(1, L, 1); b.outer.scale.set(1, L, 1);
   b.startGlow.position.copy(b.start);
   b.endGlow.position.copy(b.start.clone().addScaledVector(b.dir, L));
-
-  // fade after growth
   const f = (b.t<=b.growTime) ? 1 : Math.max(0, 1 - (b.t - b.growTime)/(b.life - b.growTime));
   b.mesh.material.opacity = 0.95*f; b.outer.material.opacity = 0.35*f;
   b.startGlow.material.opacity = 0.95*f; b.endGlow.material.opacity = 0.95*f;
@@ -436,13 +433,11 @@ function spawnMissile(reticleDir){
 // Reticle Ray → find target along center  //
 /////////////////////////////////////////////
 function getReticleRay(){
-  // center of screen (reticle) in NDC is (0,0)
   const origin = camera.position.clone();
   const dir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).normalize();
   return { origin, dir };
 }
 function rayHitAsteroids(origin, dir, maxRange){
-  // Sphere intersection test per asteroid (center/radius)
   let bestT=Infinity, best=null;
   for (let i=0;i<AST.data.length;i++){
     const a=AST.data[i]; if(!a.alive) continue;
@@ -478,7 +473,6 @@ function fireLaser(){
   if (pick.hit){
     pick.rock.hp -= ship.laser.dmg;
     if (pick.rock.hp<=0) destroyAsteroid(pick.rock);
-    // small impact flash handled by beam's end glow
   }
 }
 function fireMissile(){
@@ -486,13 +480,13 @@ function fireMissile(){
   M.heat += M.shotHeat; if (M.heat>=100){ M.over=true; toast('Missiles overheated!'); }
   M._cd = M.reload;
   const {dir} = getReticleRay();
-  spawnMissile(dir); // initial heading along reticle
+  spawnMissile(dir);
 }
 
 //////////////////////
 // Build the World  //
 //////////////////////
-let stars, planetA, planetB;
+let stars, planetA, planetB;  /* <-- declared once (fixed) */
 function buildWorld(s){
   // clear all transient visuals
   for(const b of LASER_BEAMS){ removeBeam(b); } LASER_BEAMS.length=0;
@@ -526,7 +520,6 @@ function load(){
     if (d.seed) seed=d.seed; if (d.quality) quality=d.quality;
     if (d.credits!=null) ship.credits=d.credits; if (d.cargo!=null) ship.cargo=d.cargo;
     if (d.upgrades) Object.assign(upgrades,d.upgrades);
-    // reapply upgrade scaling
     ship.laser.dmg = 50 + (upgrades.laserD-1)*18;
     ship.laser.cooldown = 30 + (upgrades.laserC-1)*6;
     ship.laser.shotHeat = Math.max(8, 18 - (upgrades.laserC-1)*2);
@@ -597,7 +590,7 @@ function updateMissiles(dt){
   for (let i=MISSILES.length-1;i>=0;i--){
     const m=MISSILES[i];
 
-    // light homing: bias toward reticle ray if a rock lies ahead
+    // light homing toward reticle ray hit
     const {origin,dir} = getReticleRay();
     const pick = rayHitAsteroids(origin, dir, 1600);
     if (pick.hit){
@@ -609,7 +602,7 @@ function updateMissiles(dt){
     m.mesh.position.copy(m.pos);
     m.life -= dt;
 
-    // leave glowing trail
+    // trail
     m.trailT = (m.trailT||0)+dt;
     if (m.trailT>0.03){
       m.trailT=0;
@@ -664,7 +657,7 @@ function updateFX(dt){
     if (t>=1){ FX.group.remove(s); s.material.map?.dispose?.(); s.material.dispose(); s.geometry?.dispose?.(); }
   }
 
-  // update laser beams (growth + fade)
+  // update laser beams
   for (let i=LASER_BEAMS.length-1;i>=0;i--){
     const b=LASER_BEAMS[i]; updateBeam(b,dt);
     if (b.t>=b.life){ removeBeam(b); LASER_BEAMS.splice(i,1); }
@@ -676,10 +669,9 @@ function loop(){
   handleInput(dt);
   ship.pos.addScaledVector(ship.vel, dt);
 
-  // ship mesh follow
+  // ship visual follow
   shipGroup.position.copy(ship.pos); shipGroup.quaternion.copy(ship.quat);
 
-  // weapons & visuals
   // cooldowns / heat
   ship.laser._cd=Math.max(0, ship.laser._cd - dt);
   ship.laser.heat=Math.max(0, ship.laser.heat - ship.laser.cooldown*dt);
@@ -712,7 +704,6 @@ function loop(){
 //////////////
 function onResize(){ renderer.setSize(innerWidth,innerHeight); camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); }
 addEventListener('resize', onResize);
-let stars, planetA, planetB;
 function init(){
   load(); ui.qual.textContent=(quality==='ultra')?'Ultra':'High'; ui.seed.textContent=seed; refreshShop();
   scene.background = new THREE.Color(0x000000);
