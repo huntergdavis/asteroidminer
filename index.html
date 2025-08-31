@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>AstroMiner — Reticle Aiming • Dual Cannons • Photon Torpedoes • Real Drops</title>
+<title>AstroMiner — Reticle Aiming • Big Glowy Drops • WS Direct Pitch</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   html,body{height:100%;margin:0;background:#000;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#eef}
@@ -19,7 +19,7 @@
   .bar>span{display:block;height:100%;background:linear-gradient(#66e,#44a);width:0}
   .bar.red>span{background:linear-gradient(#f66,#b22)}
   .cash{font-weight:700}
-  .help{position:absolute;left:10px;bottom:10px;background:rgba(0,0,0,.45);padding:8px 10px;border-radius:10px;font-size:12px;max-width:520px}
+  .help{position:absolute;left:10px;bottom:10px;background:rgba(0,0,0,.45);padding:8px 10px;border-radius:10px;font-size:12px;max-width:560px}
   .toast{position:absolute;left:50%;transform:translateX(-50%);top:10px;background:rgba(0,0,0,.5);padding:6px 10px;border-radius:10px;font-size:12px;display:none}
   .err{position:absolute;right:10px;bottom:10px;background:#300;color:#fee;padding:8px 10px;border-radius:10px;max-width:60ch;display:none;white-space:pre-wrap}
 
@@ -130,8 +130,8 @@ const ui={ seed:byId('uiSeed'), qual:byId('uiQual'), spd:byId('uiSpd'), range:by
 function byId(id){ return document.getElementById(id); }
 function toast(msg,ms=1200){ ui.toast.textContent=msg; ui.toast.style.display='block'; clearTimeout(toast._t); toast._t=setTimeout(()=>ui.toast.style.display='none',ms); }
 function showError(e){ ui.err.style.display='block'; ui.err.textContent=(typeof e==='string')?e:(e?.message||String(e)); console.error(e); }
-window.addEventListener('error', e=>showError(e.error||e.message));
-window.addEventListener('unhandledrejection', e=>showError(e.reason||e));
+addEventListener('error', e=>showError(e.error||e.message));
+addEventListener('unhandledrejection', e=>showError(e.reason||e));
 
 ///////////////////////
 // Controls (KB only)
@@ -162,7 +162,7 @@ const ship={
   missile:{ canFire:true, heat:0, over:false, cooldown:18, shotHeat:34, dmg:240, reload:0.7, _cd:0 }
 };
 
-// simple visual ship + hardpoints (local space)
+// simple visual ship + hardpoints
 const shipGroup=new THREE.Group(); scene.add(shipGroup);
 function buildShipMesh(){
   shipGroup.clear();
@@ -175,15 +175,12 @@ function buildShipMesh(){
   const wingR = wingL.clone(); wingR.position.x=1.0; shipGroup.add(wingR);
 }
 buildShipMesh();
-// dual cannon hardpoints close to “top corners”
 const HP_LOCAL = {
   laserL: new THREE.Vector3(-0.9, 0.55, -1.6),
   laserR: new THREE.Vector3( 0.9, 0.55, -1.6),
   missile: new THREE.Vector3(0, -0.05, -1.9)
 };
-function hardpointWorld(local){
-  return local.clone().applyQuaternion(ship.quat).add(ship.pos);
-}
+function hardpointWorld(local){ return local.clone().applyQuaternion(ship.quat).add(ship.pos); }
 
 //////////////////////
 // Upgrades storage //
@@ -247,37 +244,92 @@ const LASER_BEAMS=[];// {start,dir,len,mesh,outer,startGlow,endGlow,t,life,growT
 function setQuality(q){ quality=q; ui.qual.textContent=q==='ultra'?'Ultra':'High'; buildWorld(seed); }
 function newSeed(){ seed = (seed*1664525 + 1013904223)>>>0; buildWorld(seed); }
 
-function addDrops(pos,size){
-  const kinds=[
-    {name:'Iron', val:8,  color:0xa0a8b8},
-    {name:'Nickel',val:10, color:0x9fb7aa},
-    {name:'Silver',val:14, color:0xc0c0ff},
-    {name:'Gold',  val:22, color:0xffd54a},
-    {name:'Platinum',val:30,color:0xd9d9ff},
-    {name:'Iridium', val:40,color:0xa3d1ff},
-  ];
-  const count=3 + Math.floor(Math.random()*3 + size*0.6);
-  for(let i=0;i<count;i++){
-    const k=kinds[Math.min(kinds.length-1, Math.floor(Math.random()* (2+size*0.25)))];
-    spawnDrop(pos, k.val, k.color);
+/////////////////////////////
+// Loot / Drops generation //
+/////////////////////////////
+const RES_KINDS=[
+  {name:'Iron', val:8,  color:0xa0a8b8},
+  {name:'Nickel',val:10, color:0x9fb7aa},
+  {name:'Silver',val:14, color:0xc0c0ff},
+  {name:'Gold',  val:22, color:0xffd54a},
+  {name:'Platinum',val:30,color:0xd9d9ff},
+  {name:'Iridium', val:40,color:0xa3d1ff},
+];
+
+function lootColorForSize(sz){
+  if (sz>18) return 0xffd54a; // gold
+  if (sz>12) return 0xd9d9ff; // platinum
+  if (sz>8)  return 0xc0c0ff; // silver
+  return 0xa0a8b8;            // iron
+}
+
+// BIG guaranteed drops on asteroid destroy
+function addDropsOnDestroy(asteroid){
+  const baseScale = clamp(asteroid.size*0.5, 1.5, 20); // ~half the asteroid size
+  const count = 2 + (asteroid.size>20?1:0);            // 2–3 big chunks
+  for (let i=0;i<count;i++){
+    const off = new THREE.Vector3(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5).multiplyScalar(asteroid.size*0.25);
+    const pos = new THREE.Vector3(asteroid.x,asteroid.y,asteroid.z).add(off);
+    const val = Math.round(baseScale*12 + Math.random()*20);
+    const color = lootColorForSize(baseScale);
+    spawnDrop(pos, val, color, baseScale);
   }
 }
-function spawnDrop(pos,value,color){
+
+// Chance to chip small loot on any successful laser hit
+function maybeChipLoot(hitPoint){
+  if (Math.random()<0.25){ // 25% per laser impact
+    const scale = 0.8 + Math.random()*0.8; // small shard
+    const val = Math.round(6 + scale*6);
+    const color = 0xc0c0ff;
+    spawnDrop(hitPoint, val, color, scale);
+  }
+}
+
+function resetDrops(){
+  if (DROPS.inst){ scene.remove(DROPS.inst); DROPS.inst.geometry.dispose(); DROPS.inst.material.dispose(); }
+  DROPS.count=0; DROPS.data=[];
+  DROPS.geo=new THREE.OctahedronGeometry(1,0);
+  DROPS.mat=new THREE.MeshStandardMaterial({
+    vertexColors:true, roughness:0.25, metalness:0.45,
+    emissive:0x202020, emissiveIntensity:0.6
+  });
+  DROPS.cap=(quality==='ultra'?3500:2000);
+  DROPS.inst=new THREE.InstancedMesh(DROPS.geo, DROPS.mat, DROPS.cap);
+  DROPS.inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  DROPS.inst.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(DROPS.cap*3),3);
+  scene.add(DROPS.inst);
+}
+
+// loot glow sprite texture
+function makeGlowTexture(size=96, inner=0.0, outer=1.0, col='rgba(255,240,140,1)'){
+  const c=document.createElement('canvas'); c.width=c.height=size;
+  const x=c.getContext('2d'); const g=x.createRadialGradient(size/2,size/2,size*inner, size/2,size/2,size*outer);
+  g.addColorStop(0, col); g.addColorStop(1, 'rgba(255,240,140,0)'); x.fillStyle=g; x.fillRect(0,0,size,size);
+  const t=new THREE.CanvasTexture(c); t.anisotropy=4; return t;
+}
+const glowTexLoot = makeGlowTexture(128, 0.0, 0.55, 'rgba(255,240,140,1)');
+
+function spawnDrop(pos,value,color,scale=1.4){
   if (DROPS.count>=DROPS.cap) return;
   const id=DROPS.count++;
-  DROPS.data[id]={ pos:pos.clone(), vel:new THREE.Vector3((Math.random()-0.5)*2,(Math.random()-0.5)*2,(Math.random()-0.5)*2), value, alive:true, color };
-  const m=new THREE.Matrix4(), q=new THREE.Quaternion(), s=new THREE.Vector3(1.4,1.4,1.4);
+  const vel=new THREE.Vector3((Math.random()-0.5)*3,(Math.random()-0.5)*3,(Math.random()-0.5)*3);
+  const flare=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexLoot, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, opacity:0.85}));
+  flare.position.copy(pos); flare.scale.setScalar(Math.min(28, scale*1.6)); scene.add(flare);
+
+  DROPS.data[id]={ pos:pos.clone(), vel, value, alive:true, color, scale, flare };
+  const m=new THREE.Matrix4(), q=new THREE.Quaternion(), s=new THREE.Vector3(scale,scale,scale);
   m.compose(DROPS.data[id].pos,q,s);
   DROPS.inst.setMatrixAt(id,m);
-  if (!DROPS.inst.instanceColor){
-    DROPS.inst.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(DROPS.cap*3),3);
-  }
   DROPS.inst.setColorAt(id, new THREE.Color(color));
   DROPS.inst.count=DROPS.count;
   DROPS.inst.instanceMatrix.needsUpdate=true;
   DROPS.inst.instanceColor.needsUpdate=true;
 }
 
+/////////////////////////////
+// Asteroid field creation //
+/////////////////////////////
 function makeRockGeometry(seed,scale=1){
   const g=new THREE.IcosahedronGeometry(scale,1);
   const pos=g.attributes.position, R=rng(seed);
@@ -310,7 +362,8 @@ function buildAsteroids(seed){
       const a=R()*Math.PI*2, r=beltR + (R()*2-1)*beltW;
       const x=Math.cos(a)*r, z=Math.sin(a)*r, y=(R()*2-1)*beltH;
       const size= 6 + Math.pow(R(),2)*40; // 6..46
-      const hp = Math.round( (size*1.6) + (gi*8) );
+      // Easier to destroy to make drops common
+      const hp = Math.round( (size*1.1) + (gi*6) );
       const rot=new THREE.Quaternion().setFromEuler(new THREE.Euler(R()*Math.PI, R()*Math.PI, R()*Math.PI));
       const scale=new THREE.Vector3(size,size,size);
       const m=new THREE.Matrix4(); m.compose(new THREE.Vector3(x,y,z), rot, scale);
@@ -322,16 +375,6 @@ function buildAsteroids(seed){
   }
 }
 
-function resetDrops(){
-  if (DROPS.inst){ scene.remove(DROPS.inst); DROPS.inst.geometry.dispose(); DROPS.inst.material.dispose(); }
-  DROPS.count=0; DROPS.data=[]; DROPS.geo=new THREE.OctahedronGeometry(1,0);
-  DROPS.mat=new THREE.MeshStandardMaterial({vertexColors:true, roughness:0.35, metalness:0.3, emissive:0x111111, emissiveIntensity:0.35});
-  DROPS.cap=(quality==='ultra'?3000:1500);
-  DROPS.inst=new THREE.InstancedMesh(DROPS.geo, DROPS.mat, DROPS.cap);
-  DROPS.inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  scene.add(DROPS.inst);
-}
-
 function destroyAsteroid(rec){
   if (!rec.alive) return;
   rec.alive=false;
@@ -339,7 +382,8 @@ function destroyAsteroid(rec){
   const m=new THREE.Matrix4();
   m.compose(new THREE.Vector3(999999,999999,999999), new THREE.Quaternion(), new THREE.Vector3(0.0001,0.0001,0.0001));
   inst.setMatrixAt(rec.idx, m); inst.instanceMatrix.needsUpdate=true;
-  addDrops(new THREE.Vector3(rec.x,rec.y,rec.z), rec.size/10);
+
+  addDropsOnDestroy(rec);
   spawnExplosion(new THREE.Vector3(rec.x,rec.y,rec.z), rec.size);
 }
 
@@ -347,14 +391,16 @@ function destroyAsteroid(rec){
 // Visual Effects  //
 /////////////////////
 const FX={ group:new THREE.Group() }; scene.add(FX.group);
-function makeGlowTexture(size=96, inner=0.0, outer=1.0, col='rgba(130,200,255,1)'){
+
+// beam/torp glow textures
+function makeBeamGlow(size=96, inner=0.0, outer=1.0, col='rgba(130,200,255,1)'){
   const c=document.createElement('canvas'); c.width=c.height=size;
   const x=c.getContext('2d'); const g=x.createRadialGradient(size/2,size/2,size*inner, size/2,size/2,size*outer);
   g.addColorStop(0, col); g.addColorStop(1, 'rgba(130,200,255,0)'); x.fillStyle=g; x.fillRect(0,0,size,size);
   const t=new THREE.CanvasTexture(c); t.anisotropy=4; return t;
 }
-const glowTexBlue   = makeGlowTexture(128, 0.0, 0.5, 'rgba(130,200,255,1)');
-const glowTexOrange = makeGlowTexture(128, 0.0, 0.5, 'rgba(255,180,80,1)');
+const glowTexBlue   = makeBeamGlow(128, 0.0, 0.5, 'rgba(130,200,255,1)');
+const glowTexOrange = makeBeamGlow(128, 0.0, 0.5, 'rgba(255,180,80,1)');
 
 function spawnExplosion(pos,scale){
   const g=new THREE.SphereGeometry(1, 10, 8);
@@ -464,7 +510,6 @@ function fireLaser(){
   const pick = rayHitAsteroids(origin, dir, ship.range);
   const endPoint = pick.point.clone();
 
-  // twin beams from hardpoints to reticle target
   const startL = hardpointWorld(HP_LOCAL.laserL);
   const startR = hardpointWorld(HP_LOCAL.laserR);
   LASER_BEAMS.push( createLaserBeam(startL, endPoint) );
@@ -472,6 +517,7 @@ function fireLaser(){
 
   if (pick.hit){
     pick.rock.hp -= ship.laser.dmg;
+    maybeChipLoot(endPoint);
     if (pick.rock.hp<=0) destroyAsteroid(pick.rock);
   }
 }
@@ -486,7 +532,7 @@ function fireMissile(){
 //////////////////////
 // Build the World  //
 //////////////////////
-let stars, planetA, planetB;  /* <-- declared once (fixed) */
+let stars, planetA, planetB;
 function buildWorld(s){
   // clear all transient visuals
   for(const b of LASER_BEAMS){ removeBeam(b); } LASER_BEAMS.length=0;
@@ -555,7 +601,8 @@ const clock=new THREE.Clock();
 function handleInput(dt){
   // rotation
   const yaw   = ((keys['KeyA']?1:0) - (keys['KeyD']?1:0)) * ship.yawRate   * dt;
-  const pitch = ((keys['KeyS']?1:0) - (keys['KeyW']?1:0)) * ship.pitchRate * dt;
+  // SWAPPED for direct up/down: W = pitch up, S = pitch down
+  const pitch = ((keys['KeyW']?1:0) - (keys['KeyS']?1:0)) * ship.pitchRate * dt;
   const roll  = ((keys['KeyQ']?1:0) - (keys['KeyE']?1:0)) * ship.rollRate  * dt;
   const qYaw   = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),  yaw);
   const qPitch = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),  pitch);
@@ -629,21 +676,41 @@ function updateMissiles(dt){
 }
 
 function updateDrops(dt){
-  const magnet = 12 + (upgrades.magnet-1)*6;
+  // stronger magnet + auto-homing, ranges scale with drop size
+  const magnetBase = 14 + (upgrades.magnet-1)*8;
   for (let i=0;i<DROPS.count;i++){
     const d=DROPS.data[i]; if (!d || !d.alive) continue;
-    d.pos.addScaledVector(d.vel, dt); d.vel.multiplyScalar(0.995);
+    d.pos.addScaledVector(d.vel, dt);
+    d.vel.multiplyScalar(0.992);
+
+    // update glow sprite
+    if (d.flare){ d.flare.position.copy(d.pos); d.flare.scale.setScalar(Math.min(28, d.scale*1.6)); }
+
     const toShip= ship.pos.clone().sub(d.pos);
     const dist=toShip.length();
-    const range = 25 + (upgrades.magnet-1)*14;
-    if (dist < range){ d.vel.add(toShip.normalize().multiplyScalar(magnet*dt)); }
-    if (dist<6){
-      d.alive=false; const add=d.value; ship.credits += add; ship.cargo = Math.min(ship.cargoCap, ship.cargo + 1); toast('+'+add+' cr');
-      const m=new THREE.Matrix4(); m.compose(new THREE.Vector3(999999,999999,999999), new THREE.Quaternion(), new THREE.Vector3(0.0001,0.0001,0.0001));
-      DROPS.inst.setMatrixAt(i,m); DROPS.inst.instanceMatrix.needsUpdate=true; updateUI(); save();
+    const range = magnetBase + d.scale*2.0;     // larger items pull from further away
+    if (dist < range){
+      const accel = (magnetBase*1.2) + d.scale*0.8; // bigger items accelerate harder toward you
+      d.vel.add(toShip.normalize().multiplyScalar(accel*dt));
+    }
+
+    // pickup radius scales with size
+    const pickupR = 6 + d.scale*0.4;
+    if (dist < pickupR){
+      d.alive=false;
+      ship.credits += d.value;
+      ship.cargo = Math.min(ship.cargoCap, ship.cargo + 1);
+      toast('+'+d.value+' cr');
+      // hide instance
+      const mtx=new THREE.Matrix4();
+      mtx.compose(new THREE.Vector3(999999,999999,999999), new THREE.Quaternion(), new THREE.Vector3(0.0001,0.0001,0.0001));
+      DROPS.inst.setMatrixAt(i,mtx); DROPS.inst.instanceMatrix.needsUpdate=true;
+      if (d.flare){ scene.remove(d.flare); d.flare.material.map.dispose(); d.flare.material.dispose(); }
+      updateUI(); save();
     } else {
-      const m=new THREE.Matrix4(); m.compose(d.pos, new THREE.Quaternion(), new THREE.Vector3(1.4,1.4,1.4));
-      DROPS.inst.setMatrixAt(i,m); DROPS.inst.instanceMatrix.needsUpdate=true;
+      const mtx=new THREE.Matrix4();
+      mtx.compose(d.pos, new THREE.Quaternion(), new THREE.Vector3(d.scale,d.scale,d.scale));
+      DROPS.inst.setMatrixAt(i,mtx); DROPS.inst.instanceMatrix.needsUpdate=true;
     }
   }
 }
