@@ -23,7 +23,6 @@
   .toast{position:absolute;left:50%;transform:translateX(-50%);top:10px;background:rgba(0,0,0,.5);padding:6px 10px;border-radius:10px;font-size:12px;display:none}
   .err{position:absolute;right:10px;bottom:10px;background:#300;color:#fee;padding:8px 10px;border-radius:10px;max-width:60ch;display:none;white-space:pre-wrap}
 
-  /* Targeting reticle (center) */
   .ret{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;opacity:.9}
   .ret .ring{width:46px;height:46px;border:2px solid rgba(173,216,255,.9);border-radius:50%;box-shadow:0 0 18px rgba(120,180,255,.55) inset,0 0 22px rgba(120,180,255,.35)}
   .ret .lines{position:absolute;left:0;top:0;width:46px;height:46px}
@@ -75,10 +74,12 @@
 <script type="module">
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 
+/* ---------- Utils ---------- */
 const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
 const rad=THREE.MathUtils.degToRad;
 function rng(seed){ let s=seed>>>0; return ()=>{ s+=0x6D2B79F5; let t=Math.imul(s^(s>>>15),1|s); t^=t+Math.imul(t^(t>>>7),61|t); return ((t^(t>>>14))>>>0)/4294967296; }; }
 
+/* ---------- Scene ---------- */
 const app=document.getElementById('app');
 const scene=new THREE.Scene();
 const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,0.1,240000);
@@ -86,16 +87,15 @@ camera.position.set(0,0,0);
 const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});
 renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth,innerHeight);
 app.appendChild(renderer.domElement);
-
 scene.add(new THREE.AmbientLight(0x222233,0.95));
-const sun=new THREE.DirectionalLight(0xffffff,0.8);
-sun.position.set(1,0.2,0.3).multiplyScalar(30000); scene.add(sun);
+const sun=new THREE.DirectionalLight(0xffffff,0.8); sun.position.set(1,0.2,0.3).multiplyScalar(30000); scene.add(sun);
 
+/* ---------- Stars/Planets ---------- */
 function makeStarfield(seed,count,spread=60000){
   const R=rng(seed), geo=new THREE.BufferGeometry(), pos=new Float32Array(count*3);
   for(let i=0;i<count;i++){
     const r=spread*Math.pow(R(),0.25), th=R()*Math.PI*2, ph=Math.acos(2*R()-1);
-    pos[i*3  ]=r*Math.sin(ph)*Math.cos(th);
+    pos[i*3]=r*Math.sin(ph)*Math.cos(th);
     pos[i*3+1]=r*Math.cos(ph);
     pos[i*3+2]=r*Math.sin(ph)*Math.sin(th);
   }
@@ -108,20 +108,25 @@ function makePlanet(radius,dist,colorHex){
   const s=new THREE.Mesh(g,m); s.position.set(dist*0.8,dist*0.2,-dist); return s;
 }
 
-function byId(id){ return document.getElementById(id); }
-const ui={ seed:byId('uiSeed'), qual:byId('uiQual'), spd:byId('uiSpd'), range:byId('uiRange'),
-  barLaser:byId('barLaser'), barMiss:byId('barMiss'), credits:byId('uiCredits'), cargo:byId('uiCargo'), cap:byId('uiCap'),
+/* ---------- DOM/UI ---------- */
+const byId = id=>document.getElementById(id);
+const ui={
+  seed:byId('uiSeed'), qual:byId('uiQual'),
+  spd:byId('uiSpd'), range:byId('uiRange'),
+  barLaser:byId('barLaser'), barMiss:byId('barMiss'),
+  credits:byId('uiCredits'), cargo:byId('uiCargo'), cap:byId('uiCap'),
   toast:byId('toast'), err:byId('err'), shop:byId('shop'),
   lvLaserD:byId('lvLaserD'), lvLaserC:byId('lvLaserC'), lvMissD:byId('lvMissD'),
   lvThrust:byId('lvThrust'), lvTurn:byId('lvTurn'), lvMag:byId('lvMag'),
-  costLaserD:byId('costLaserD'), costLaserC:byId('costLaserC'),
-  costMissD:byId('costMissD'), costThrust:byId('costThrust'), costTurn:byId('costTurn'), costMag:byId('costMag') };
+  costLaserD:byId('costLaserD'), costLaserC:byId('costLaserC'), costMissD:byId('costMissD'),
+  costThrust:byId('costThrust'), costTurn:byId('costTurn'), costMag:byId('costMag')
+};
 function toast(msg,ms=1200){ ui.toast.textContent=msg; ui.toast.style.display='block'; clearTimeout(toast._t); toast._t=setTimeout(()=>ui.toast.style.display='none',ms); }
 function showError(e){ ui.err.style.display='block'; ui.err.textContent=(typeof e==='string')?e:(e?.message||String(e)); console.error(e); }
 addEventListener('error', e=>showError(e.error||e.message));
 addEventListener('unhandledrejection', e=>showError(e.reason||e));
 
-/* ---------- Controls ---------- */
+/* ---------- Input ---------- */
 const keys={};
 addEventListener('keydown',e=>{
   keys[e.code]=true;
@@ -135,7 +140,7 @@ addEventListener('keyup',e=>{ keys[e.code]=false; });
 function toggleShop(){ ui.shop.style.display = (ui.shop.style.display==='none'?'block':'none'); }
 ui.shop.style.display='block';
 
-/* ---------- Ship & weapons ---------- */
+/* ---------- Ship ---------- */
 const ship={
   pos:new THREE.Vector3(), vel:new THREE.Vector3(), quat:new THREE.Quaternion(),
   thrust:36, strafe:28, lift:28,
@@ -145,21 +150,12 @@ const ship={
   laser:{ canFire:true, heat:0, over:false, cooldown:30, shotHeat:18, dmg:50, rof:10, _cd:0 },
   missile:{ canFire:true, heat:0, over:false, cooldown:18, shotHeat:34, dmg:240, reload:0.7, _cd:0 }
 };
-
-// visual ship (hidden in first-person)
-const shipGroup=new THREE.Group(); scene.add(shipGroup);
-shipGroup.visible=false; // <— never show the model
-function buildShipMesh(){
-  shipGroup.clear();
-  const body = new THREE.Mesh(new THREE.ConeGeometry(0.6,2.2,10), new THREE.MeshStandardMaterial({color:0x99aaff, roughness:0.4, metalness:0.2}));
-  body.rotation.x=Math.PI/2; shipGroup.add(body);
-}
-buildShipMesh();
-const HP_LOCAL = { laserL: new THREE.Vector3(-0.9,0.55,-1.6), laserR:new THREE.Vector3(0.9,0.55,-1.6), missile:new THREE.Vector3(0,-0.05,-1.9) };
-const eyeLocal = new THREE.Vector3(0,0.18,0); // cockpit offset
+const shipGroup=new THREE.Group(); scene.add(shipGroup); shipGroup.visible=false; // true FPV
+const HP_LOCAL = { laserL:new THREE.Vector3(-0.9,0.55,-1.6), laserR:new THREE.Vector3(0.9,0.55,-1.6), missile:new THREE.Vector3(0,-0.05,-1.9) };
+const eyeLocal = new THREE.Vector3(0,0.18,0);
 function hardpointWorld(local){ return local.clone().applyQuaternion(ship.quat).add(ship.pos); }
 
-/* ---------- Upgrades (unchanged UI wiring) ---------- */
+/* ---------- Upgrades ---------- */
 const upgrades={ laserD:1, laserC:1, missD:1, thrust:1, turn:1, magnet:1, lightning:false, mass:false, grav:false };
 const baseCosts={ laserD:200, laserC:150, missD:300, thrust:250, turn:200, magnet:180 };
 function levelCost(base,lv){ return Math.round(base * Math.pow(1.6, lv-1)); }
@@ -174,64 +170,18 @@ function refreshShop(){
   ui.costMag.textContent=levelCost(baseCosts.magnet, upgrades.magnet+1);
 }
 
-/* ---------- Asteroids, Drops ---------- */
+/* ---------- Field / Drops ---------- */
 let quality='high', seed=(Math.random()*1e9)|0;
 const AST={ inst:[], data:[], count:0, geo:[], mat:null };
 const DROPS={ inst:null, data:[], count:0, cap:0, geo:null, mat:null };
-const MISSILES=[];   // {pos,vel,life,mesh,trailT}
-const LASER_BEAMS=[];// {start,dir,len,mesh,outer,startGlow,endGlow,t,life,growTime}
-
-function setQuality(q){ quality=q; ui.qual.textContent=q==='ultra'?'Ultra':'High'; buildWorld(seed); }
-function newSeed(){ seed = (seed*1664525 + 1013904223)>>>0; buildWorld(seed); }
+const MISSILES=[];   // projectiles
+const LASER_BEAMS=[];// beam visuals
+let stars, planetA, planetB;
 
 const RES_KINDS=[{name:'Iron',val:8,color:0xa0a8b8},{name:'Nickel',val:10,color:0x9fb7aa},{name:'Silver',val:14,color:0xc0c0ff},{name:'Gold',val:22,color:0xffd54a},{name:'Platinum',val:30,color:0xd9d9ff},{name:'Iridium',val:40,color:0xa3d1ff}];
-function lootColorForSize(sz){ if(sz>18) return 0xffd54a; if(sz>12) return 0xd9d9ff; if(sz>8) return 0xc0c0ff; return 0xa0a8b8; }
+const lootColorForSize = sz => (sz>18?0xffd54a:sz>12?0xd9d9ff:sz>8?0xc0c0ff:0xa0a8b8);
 
-function addDropsOnDestroy(a){
-  const baseScale=clamp(a.size*0.5,1.5,20);
-  const count=2+(a.size>20?1:0);
-  for(let i=0;i<count;i++){
-    const off=new THREE.Vector3(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5).multiplyScalar(a.size*0.25);
-    const pos=new THREE.Vector3(a.x,a.y,a.z).add(off);
-    spawnDrop(pos, Math.round(baseScale*12+Math.random()*20), lootColorForSize(baseScale), baseScale);
-  }
-}
-function maybeChipLoot(p){ if(Math.random()<0.25) spawnDrop(p, Math.round(10+Math.random()*10), 0xc0c0ff, 1.2); }
-
-function resetDrops(){
-  if(DROPS.inst){ scene.remove(DROPS.inst); DROPS.inst.geometry.dispose(); DROPS.inst.material.dispose(); }
-  DROPS.count=0; DROPS.data=[];
-  DROPS.geo=new THREE.OctahedronGeometry(1,0);
-  // UNLIT material so it glows from all sides
-  DROPS.mat=new THREE.MeshBasicMaterial({ vertexColors:true });
-  DROPS.cap=(quality==='ultra'?3500:2000);
-  DROPS.inst=new THREE.InstancedMesh(DROPS.geo, DROPS.mat, DROPS.cap);
-  DROPS.inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  DROPS.inst.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(DROPS.cap*3),3);
-  scene.add(DROPS.inst);
-}
-function makeGlowTexture(size=96, inner=0.0, outer=1.0, col='rgba(255,240,140,1)'){
-  const c=document.createElement('canvas'); c.width=c.height=size;
-  const x=c.getContext('2d'); const g=x.createRadialGradient(size/2,size/2,size*inner, size/2,size/2,size*outer);
-  g.addColorStop(0,col); g.addColorStop(1,'rgba(255,240,140,0)'); x.fillStyle=g; x.fillRect(0,0,size,size);
-  const t=new THREE.CanvasTexture(c); t.anisotropy=4; return t;
-}
-const glowTexLoot=makeGlowTexture(128,0.0,0.55,'rgba(255,240,140,1)');
-function spawnDrop(pos,value,color,scale=1.4){
-  if(DROPS.count>=DROPS.cap) return;
-  const id=DROPS.count++;
-  const vel=new THREE.Vector3((Math.random()-0.5)*3,(Math.random()-0.5)*3,(Math.random()-0.5)*3);
-  const flare=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexLoot, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, opacity:0.9}));
-  flare.position.copy(pos); flare.scale.setScalar(Math.min(32, scale*1.8)); scene.add(flare);
-  DROPS.data[id]={ pos:pos.clone(), vel, value, alive:true, color, scale, flare };
-  const m=new THREE.Matrix4(), q=new THREE.Quaternion(), s=new THREE.Vector3(scale,scale,scale);
-  m.compose(DROPS.data[id].pos,q,s);
-  DROPS.inst.setMatrixAt(id,m); DROPS.inst.setColorAt(id,new THREE.Color(color));
-  DROPS.inst.count=DROPS.count; DROPS.inst.instanceMatrix.needsUpdate=true; DROPS.inst.instanceColor.needsUpdate=true;
-}
-
-function makeRockGeometry(seed,scale=1){
-  const g=new THREE.IcosahedronGeometry(scale,1), pos=g.attributes.position, R=rng(seed);
+function makeRockGeometry(seed,scale=1){ const g=new THREE.IcosahedronGeometry(scale,1),pos=g.attributes.position,R=rng(seed);
   for(let i=0;i<pos.count;i++){ const v=new THREE.Vector3(pos.getX(i),pos.getY(i),pos.getZ(i)), n=v.clone().normalize(); v.addScaledVector(n,(R()-0.5)*(0.35+R()*0.55)); pos.setXYZ(i,v.x,v.y,v.z); }
   g.computeVertexNormals(); return g;
 }
@@ -241,8 +191,8 @@ function buildAsteroids(seed){
   const count=(quality==='ultra')?1800:900;
   AST.geo=[ makeRockGeometry(seed^0x1111,1), makeRockGeometry(seed^0x2222,1.2), makeRockGeometry(seed^0x3333,0.9) ];
   AST.mat=new THREE.MeshStandardMaterial({color:0x88909a, roughness:0.95, metalness:0.05});
-  const per=[Math.floor(count*0.4), Math.floor(count*0.35), count-Math.floor(count*0.4)-Math.floor(count*0.35)];
-  const beltR=2500,beltW=1200,beltH=800, R=rng(seed^0xBEEF);
+  const per=[Math.floor(count*0.4),Math.floor(count*0.35),count-Math.floor(count*0.4)-Math.floor(count*0.35)];
+  const beltR=2500,beltW=1200,beltH=800,R=rng(seed^0xBEEF);
   for(let gi=0;gi<3;gi++){
     const n=per[gi], inst=new THREE.InstancedMesh(AST.geo[gi],AST.mat,n);
     inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage); inst.frustumCulled=false; scene.add(inst); AST.inst.push(inst);
@@ -250,59 +200,83 @@ function buildAsteroids(seed){
       const a=R()*Math.PI*2, r=beltR+(R()*2-1)*beltW, x=Math.cos(a)*r, z=Math.sin(a)*r, y=(R()*2-1)*beltH;
       const size=6+Math.pow(R(),2)*40, hp=Math.round((size*1.1)+(gi*6));
       const rot=new THREE.Quaternion().setFromEuler(new THREE.Euler(R()*Math.PI,R()*Math.PI,R()*Math.PI));
-      const m=new THREE.Matrix4(); m.compose(new THREE.Vector3(x,y,z), rot, new THREE.Vector3(size,size,size));
+      const m=new THREE.Matrix4(); m.compose(new THREE.Vector3(x,y,z),rot,new THREE.Vector3(size,size,size));
       inst.setMatrixAt(i,m); AST.data.push({x,y,z,size,hp,alive:true,gi,idx:i}); AST.count++;
     }
     inst.instanceMatrix.needsUpdate=true;
   }
 }
+
+function resetDrops(){
+  if(DROPS.inst){ scene.remove(DROPS.inst); DROPS.inst.geometry.dispose(); DROPS.inst.material.dispose(); }
+  DROPS.count=0; DROPS.data=[]; DROPS.geo=new THREE.OctahedronGeometry(1,0);
+  DROPS.mat=new THREE.MeshBasicMaterial({vertexColors:true}); // unlit → omni-glow
+  DROPS.cap=(quality==='ultra'?3500:2000);
+  DROPS.inst=new THREE.InstancedMesh(DROPS.geo,DROPS.mat,DROPS.cap);
+  DROPS.inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  DROPS.inst.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(DROPS.cap*3),3);
+  scene.add(DROPS.inst);
+}
+function makeGlowTexture(size=96, inner=0.0, outer=1.0, col='rgba(255,240,140,1)'){ const c=document.createElement('canvas'); c.width=c.height=size;
+  const x=c.getContext('2d'); const g=x.createRadialGradient(size/2,size/2,size*inner,size/2,size/2,size*outer); g.addColorStop(0,col); g.addColorStop(1,'rgba(255,240,140,0)');
+  x.fillStyle=g; x.fillRect(0,0,size,size); const t=new THREE.CanvasTexture(c); t.anisotropy=4; return t; }
+const glowTexLoot=makeGlowTexture(128,0.0,0.55,'rgba(255,240,140,1)');
+function spawnDrop(pos,value,color,scale=1.4){
+  if(DROPS.count>=DROPS.cap) return;
+  const id=DROPS.count++, vel=new THREE.Vector3((Math.random()-0.5)*3,(Math.random()-0.5)*3,(Math.random()-0.5)*3);
+  const flare=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexLoot,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.9}));
+  flare.position.copy(pos); flare.scale.setScalar(Math.min(32,scale*1.8)); scene.add(flare);
+  DROPS.data[id]={pos:pos.clone(),vel,value,alive:true,color,scale,flare};
+  const m=new THREE.Matrix4(); m.compose(DROPS.data[id].pos,new THREE.Quaternion(),new THREE.Vector3(scale,scale,scale));
+  DROPS.inst.setMatrixAt(id,m); DROPS.inst.setColorAt(id,new THREE.Color(color)); DROPS.inst.count=DROPS.count;
+  DROPS.inst.instanceMatrix.needsUpdate=true; DROPS.inst.instanceColor.needsUpdate=true;
+}
+const lootColorForSize2 = lootColorForSize;
+function addDropsOnDestroy(a){ const baseScale=clamp(a.size*0.5,1.5,20), count=2+(a.size>20?1:0);
+  for(let i=0;i<count;i++){ const off=new THREE.Vector3(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5).multiplyScalar(a.size*0.25);
+    const pos=new THREE.Vector3(a.x,a.y,a.z).add(off);
+    spawnDrop(pos,Math.round(baseScale*12+Math.random()*20),lootColorForSize2(baseScale),baseScale); } }
+function maybeChipLoot(p){ if(Math.random()<0.25) spawnDrop(p,Math.round(10+Math.random()*10),0xc0c0ff,1.2); }
+
 function destroyAsteroid(rec){
   if(!rec.alive) return; rec.alive=false;
   const inst=AST.inst[rec.gi], m=new THREE.Matrix4();
-  m.compose(new THREE.Vector3(999999,999999,999999), new THREE.Quaternion(), new THREE.Vector3(0.0001,0.0001,0.0001));
+  m.compose(new THREE.Vector3(999999,999999,999999),new THREE.Quaternion(),new THREE.Vector3(0.0001,0.0001,0.0001));
   inst.setMatrixAt(rec.idx,m); inst.instanceMatrix.needsUpdate=true;
-  addDropsOnDestroy(rec);
-  spawnExplosion(new THREE.Vector3(rec.x,rec.y,rec.z), rec.size);
+  addDropsOnDestroy(rec); spawnExplosion(new THREE.Vector3(rec.x,rec.y,rec.z),rec.size);
 }
 
-/* ---------- FX & Beams ---------- */
+/* ---------- FX & Weapons ---------- */
 const FX={ group:new THREE.Group() }; scene.add(FX.group);
-function makeBeamGlow(size=96, inner=0.0, outer=1.0, col='rgba(130,200,255,1)'){
-  const c=document.createElement('canvas'); c.width=c.height=size;
-  const x=c.getContext('2d'); const g=x.createRadialGradient(size/2,size/2,size*inner, size/2,size/2,size*outer);
-  g.addColorStop(0,col); g.addColorStop(1,'rgba(130,200,255,0)'); x.fillStyle=g; x.fillRect(0,0,size,size);
-  const t=new THREE.CanvasTexture(c); t.anisotropy=4; return t;
-}
-const glowTexBlue=makeBeamGlow(128,0.0,0.5,'rgba(130,200,255,1)');
-const glowTexOrange=makeBeamGlow(128,0.0,0.5,'rgba(255,180,80,1)');
-function spawnExplosion(pos,scale){
-  const g=new THREE.SphereGeometry(1,10,8), m=new THREE.MeshBasicMaterial({color:0xffaa55, transparent:true, opacity:0.9, blending:THREE.AdditiveBlending, depthWrite:false});
-  const s=new THREE.Mesh(g,m); s.position.copy(pos); s.scale.setScalar(0.5);
-  s.userData.t=0; s.userData.life=0.4; s.userData.scale=scale*0.08+0.6; FX.group.add(s);
-}
+function makeBeamGlow(size=96,inner=0,outer=1,col='rgba(130,200,255,1)'){ const c=document.createElement('canvas'); c.width=c.height=size;
+  const x=c.getContext('2d'), g=x.createRadialGradient(size/2,size/2,size*inner,size/2,size/2,size*outer);
+  g.addColorStop(0,col); g.addColorStop(1,'rgba(130,200,255,0)'); x.fillStyle=g; x.fillRect(0,0,size,size); const t=new THREE.CanvasTexture(c); t.anisotropy=4; return t; }
+const glowTexBlue = makeBeamGlow(128,0,0.5,'rgba(130,200,255,1)');
+const glowTexOrange = makeBeamGlow(128,0,0.5,'rgba(255,180,80,1)');
+
+function spawnExplosion(pos,scale){ const g=new THREE.SphereGeometry(1,10,8),
+  m=new THREE.MeshBasicMaterial({color:0xffaa55,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false});
+  const s=new THREE.Mesh(g,m); s.position.copy(pos); s.scale.setScalar(0.5); s.userData.t=0; s.userData.life=0.4; s.userData.scale=scale*0.08+0.6; FX.group.add(s); }
+
 function createLaserBeam(start,end){
   const dir=end.clone().sub(start), len=Math.max(0.001,dir.length()), dirN=dir.clone().normalize();
   const gCore=new THREE.CylinderGeometry(1.3,1.3,1,18,1,true);
-  const mCore=new THREE.MeshBasicMaterial({color:0x88ccff, transparent:true, opacity:0.95, blending:THREE.AdditiveBlending, depthWrite:false});
+  const mCore=new THREE.MeshBasicMaterial({color:0x88ccff,transparent:true,opacity:0.95,blending:THREE.AdditiveBlending,depthWrite:false});
   const core=new THREE.Mesh(gCore,mCore);
   const gGlow=new THREE.CylinderGeometry(2.6,2.6,1,18,1,true);
-  const mGlow=new THREE.MeshBasicMaterial({color:0x66aaff, transparent:true, opacity:0.35, blending:THREE.AdditiveBlending, depthWrite:false});
+  const mGlow=new THREE.MeshBasicMaterial({color:0x66aaff,transparent:true,opacity:0.35,blending:THREE.AdditiveBlending,depthWrite:false});
   const glow=new THREE.Mesh(gGlow,mGlow);
   const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),dirN);
   core.quaternion.copy(q); glow.quaternion.copy(q);
-  const startSprite=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexBlue, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, opacity:0.95}));
-  const endSprite=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexBlue, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, opacity:0.95}));
-  startSprite.scale.set(7,7,1); endSprite.scale.set(9,9,1);
-  scene.add(core,glow,startSprite,endSprite);
+  const startSprite=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexBlue,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:0.95}));
+  const endSprite  =new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexBlue,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:0.95}));
+  startSprite.scale.set(7,7,1); endSprite.scale.set(9,9,1); scene.add(core,glow,startSprite,endSprite);
   return {start:start.clone(),dir:dirN,len,mesh:core,outer:glow,startGlow:startSprite,endGlow:endSprite,t:0,life:0.22,growTime:0.06};
 }
 function updateBeam(b,dt){
-  b.t+=dt; const p=Math.min(1,b.t/b.growTime), L=b.len*p;
-  const mid=b.start.clone().addScaledVector(b.dir,L*0.5);
-  b.mesh.position.copy(mid); b.outer.position.copy(mid);
-  b.mesh.scale.set(1,L,1); b.outer.scale.set(1,L,1);
-  b.startGlow.position.copy(b.start);
-  b.endGlow.position.copy(b.start.clone().addScaledVector(b.dir,L));
+  b.t+=dt; const p=Math.min(1,b.t/b.growTime), L=b.len*p, mid=b.start.clone().addScaledVector(b.dir,L*0.5);
+  b.mesh.position.copy(mid); b.outer.position.copy(mid); b.mesh.scale.set(1,L,1); b.outer.scale.set(1,L,1);
+  b.startGlow.position.copy(b.start); b.endGlow.position.copy(b.start.clone().addScaledVector(b.dir,L));
   const f=(b.t<=b.growTime)?1:Math.max(0,1-(b.t-b.growTime)/(b.life-b.growTime));
   b.mesh.material.opacity=0.95*f; b.outer.material.opacity=0.35*f; b.startGlow.material.opacity=0.95*f; b.endGlow.material.opacity=0.95*f;
 }
@@ -311,20 +285,18 @@ function removeBeam(b){
   b.mesh.geometry.dispose(); b.mesh.material.dispose(); b.outer.geometry.dispose(); b.outer.material.dispose();
   b.startGlow.material.map.dispose(); b.startGlow.material.dispose(); b.endGlow.material.map.dispose(); b.endGlow.material.dispose();
 }
+
 function spawnMissile(dir){
   const nose=hardpointWorld(HP_LOCAL.missile);
-  const core=new THREE.Mesh(new THREE.SphereGeometry(0.7,14,12), new THREE.MeshBasicMaterial({color:0xffcc88, transparent:true, opacity:1, blending:THREE.AdditiveBlending, depthWrite:false}));
-  const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexOrange, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, opacity:0.9}));
+  const core=new THREE.Mesh(new THREE.SphereGeometry(0.7,14,12), new THREE.MeshBasicMaterial({color:0xffcc88,transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false}));
+  const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexOrange,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.9}));
   glow.scale.set(7,7,1); const group=new THREE.Group(); group.add(glow,core); group.position.copy(nose); scene.add(group);
-  MISSILES.push({pos:nose.clone(), vel:dir.clone().multiplyScalar(180), life:10, mesh:group, trailT:0});
+  MISSILES.push({pos:nose.clone(),vel:dir.clone().multiplyScalar(180),life:10,mesh:group,trailT:0});
 }
 
-/* ---------- Reticle ray ---------- */
-function getReticleRay(){
-  const origin=camera.position.clone();
-  const dir=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).normalize();
-  return {origin,dir};
-}
+/* ---------- Aiming / Ray ---------- */
+function getReticleRay(){ const origin=camera.position.clone();
+  const dir=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).normalize(); return {origin,dir}; }
 function rayHitAsteroids(origin,dir,maxRange){
   let bestT=Infinity,best=null;
   for(const a of AST.data){ if(!a.alive) continue;
@@ -338,8 +310,7 @@ function rayHitAsteroids(origin,dir,maxRange){
 
 /* ---------- Fire ---------- */
 function fireLaser(){
-  const L=ship.laser; if(L.over||L._cd>0) return;
-  L.heat+=L.shotHeat; if(L.heat>=100){ L.over=true; toast('Laser overheated!'); }
+  const L=ship.laser; if(L.over||L._cd>0) return; L.heat+=L.shotHeat; if(L.heat>=100){ L.over=true; toast('Laser overheated!'); }
   L._cd=1/Math.max(3,ship.laser.rof);
   const {origin,dir}=getReticleRay(); const pick=rayHitAsteroids(origin,dir,ship.range); const endPoint=pick.point.clone();
   const startL=hardpointWorld(HP_LOCAL.laserL), startR=hardpointWorld(HP_LOCAL.laserR);
@@ -347,13 +318,11 @@ function fireLaser(){
   if(pick.hit){ pick.rock.hp-=ship.laser.dmg; maybeChipLoot(endPoint); if(pick.rock.hp<=0) destroyAsteroid(pick.rock); }
 }
 function fireMissile(){
-  const M=ship.missile; if(M.over||M._cd>0) return;
-  M.heat+=M.shotHeat; if(M.heat>=100){ M.over=true; toast('Missiles overheated!'); }
+  const M=ship.missile; if(M.over||M._cd>0) return; M.heat+=M.shotHeat; if(M.heat>=100){ M.over=true; toast('Missiles overheated!'); }
   M._cd=M.reload; const {dir}=getReticleRay(); spawnMissile(dir);
 }
 
-/* ---------- Build world ---------- */
-let stars, planetA, planetB;
+/* ---------- Build World ---------- */
 function buildWorld(s){
   for(const b of LASER_BEAMS){ removeBeam(b); } LASER_BEAMS.length=0;
   for(let i=MISSILES.length-1;i>=0;i--){ scene.remove(MISSILES[i].mesh); } MISSILES.length=0;
@@ -371,16 +340,13 @@ function buildWorld(s){
 /* ---------- Save/Load ---------- */
 const LSKEY='astrominer_save_v1';
 function save(){ localStorage.setItem(LSKEY, JSON.stringify({seed,quality,credits:ship.credits,cargo:ship.cargo,upgrades})); }
-function load(){
-  try{ const j=localStorage.getItem(LSKEY); if(!j) return; const d=JSON.parse(j);
-    if(d.seed) seed=d.seed; if(d.quality) quality=d.quality; if(d.credits!=null) ship.credits=d.credits; if(d.cargo!=null) ship.cargo=d.cargo; if(d.upgrades) Object.assign(upgrades,d.upgrades);
-    ship.laser.dmg=50+(upgrades.laserD-1)*18; ship.laser.cooldown=30+(upgrades.laserC-1)*6; ship.laser.shotHeat=Math.max(8,18-(upgrades.laserC-1)*2);
-    ship.missile.dmg=240+(upgrades.missD-1)*80;
-    ship.thrust=36+(upgrades.thrust-1)*6; ship.strafe=28+(upgrades.thrust-1)*5; ship.lift=28+(upgrades.thrust-1)*5; ship.maxSpeed=280+(upgrades.thrust-1)*20;
-    ship.yawRate=rad(100+(upgrades.turn-1)*10); ship.pitchRate=rad(100+(upgrades.turn-1)*10); ship.rollRate=rad(180+(upgrades.turn-1)*18);
-    ship.cargoCap=100+(upgrades.magnet-1)*50;
-  }catch(e){ console.warn('save load failed',e); }
-}
+function load(){ try{ const j=localStorage.getItem(LSKEY); if(!j) return; const d=JSON.parse(j);
+  if(d.seed) seed=d.seed; if(d.quality) quality=d.quality; if(d.credits!=null) ship.credits=d.credits; if(d.cargo!=null) ship.cargo=d.cargo; if(d.upgrades) Object.assign(upgrades,d.upgrades);
+  ship.laser.dmg=50+(upgrades.laserD-1)*18; ship.laser.cooldown=30+(upgrades.laserC-1)*6; ship.laser.shotHeat=Math.max(8,18-(upgrades.laserC-1)*2);
+  ship.missile.dmg=240+(upgrades.missD-1)*80;
+  ship.thrust=36+(upgrades.thrust-1)*6; ship.strafe=28+(upgrades.thrust-1)*5; ship.lift=28+(upgrades.thrust-1)*5; ship.maxSpeed=280+(upgrades.thrust-1)*20;
+  ship.yawRate=rad(100+(upgrades.turn-1)*10); ship.pitchRate=rad(100+(upgrades.turn-1)*10); ship.rollRate=rad(180+(upgrades.turn-1)*18);
+  ship.cargoCap=100+(upgrades.magnet-1)*50; }catch(e){ console.warn('save load failed',e); } }
 
 /* ---------- UI ---------- */
 function updateUI(){
@@ -393,12 +359,11 @@ function updateUI(){
   refreshShop();
 }
 
-/* ---------- Game loop ---------- */
+/* ---------- Loop ---------- */
 const clock=new THREE.Clock();
 function handleInput(dt){
   const yaw=((keys['KeyA']?1:0)-(keys['KeyD']?1:0))*ship.yawRate*dt;
-  // DIRECT pitch: W=up, S=down
-  const pitch=((keys['KeyW']?1:0)-(keys['KeyS']?1:0))*ship.pitchRate*dt;
+  const pitch=((keys['KeyW']?1:0)-(keys['KeyS']?1:0))*ship.pitchRate*dt; // W=up, S=down
   const roll=((keys['KeyQ']?1:0)-(keys['KeyE']?1:0))*ship.rollRate*dt;
   const qYaw=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),yaw);
   const qPitch=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),pitch);
@@ -436,21 +401,17 @@ function updateMissiles(dt){
   }
 }
 function updateDrops(dt){
-  // Stronger, farther magnet — scales with size
-  const magnetBase = 30 + (upgrades.magnet-1)*12;  // was ~14; now much farther
+  const magnetBase = 30 + (upgrades.magnet-1)*12; // larger radius than before
   for(let i=0;i<DROPS.count;i++){
     const d=DROPS.data[i]; if(!d||!d.alive) continue;
     d.pos.addScaledVector(d.vel,dt); d.vel.multiplyScalar(0.992);
     if(d.flare){ d.flare.position.copy(d.pos); d.flare.scale.setScalar(Math.min(32,d.scale*1.8)); }
     const toShip=ship.pos.clone().sub(d.pos); const dist=toShip.length();
-    const range = magnetBase + d.scale*5.0;           // larger items attract from much farther
-    if(dist<range){ d.vel.add(toShip.normalize().multiplyScalar(((magnetBase*1.4)+d.scale)*dt)); }
-    const pickupR = 6 + d.scale*0.6;                  // bigger auto-absorb radius
-    if(dist<pickupR){
+    const range = magnetBase + d.scale*5.0; if(dist<range){ d.vel.add(toShip.normalize().multiplyScalar(((magnetBase*1.4)+d.scale)*dt)); }
+    const pickupR = 6 + d.scale*0.6; if(dist<pickupR){
       d.alive=false; ship.credits+=d.value; ship.cargo=Math.min(ship.cargoCap,ship.cargo+1); toast('+'+d.value+' cr');
-      const mtx=new THREE.Matrix4(); mtx.compose(new THREE.Vector3(999999,999999,999999), new THREE.Quaternion(), new THREE.Vector3(0.0001,0.0001,0.0001));
-      DROPS.inst.setMatrixAt(i,mtx); DROPS.inst.instanceMatrix.needsUpdate=true;
-      if(d.flare){ scene.remove(d.flare); d.flare.material.map.dispose(); d.flare.material.dispose(); }
+      const mtx=new THREE.Matrix4(); mtx.compose(new THREE.Vector3(999999,999999,999999),new THREE.Quaternion(),new THREE.Vector3(0.0001,0.0001,0.0001));
+      DROPS.inst.setMatrixAt(i,mtx); DROPS.inst.instanceMatrix.needsUpdate=true; if(d.flare){ scene.remove(d.flare); d.flare.material.map.dispose(); d.flare.material.dispose(); }
       updateUI(); save();
     } else {
       const mtx=new THREE.Matrix4(); mtx.compose(d.pos,new THREE.Quaternion(),new THREE.Vector3(d.scale,d.scale,d.scale));
@@ -467,24 +428,15 @@ function updateFX(dt){
   }
   for(let i=LASER_BEAMS.length-1;i>=0;i--){ const b=LASER_BEAMS[i]; updateBeam(b,dt); if(b.t>=b.life){ removeBeam(b); LASER_BEAMS.splice(i,1); } }
 }
-
-/* ---------- UI & loop ---------- */
-const uiQual=byId('uiQual'), uiSeed=byId('uiSeed'), uiCap=byId('uiCap');
-function updateUI(){ ui.spd.textContent=ship.vel.length().toFixed(1); ui.range.textContent=ship.range.toFixed(0); ui.credits.textContent=ship.credits|0; ui.cargo.textContent=ship.cargo|0; ui.barLaser.style.width=clamp(ship.laser.heat,0,100)+'%'; ui.barMiss.style.width=clamp(ship.missile.heat,0,100)+'%'; refreshShop(); }
-let stars, planetA, planetB;
-const clock=new THREE.Clock();
-function handleInput(dt){ /* handled above */ }
 function loop(){
   const dt=Math.min(0.033,clock.getDelta());
-  handleInput(dt);
-  ship.pos.addScaledVector(ship.vel,dt);
+  handleInput(dt); ship.pos.addScaledVector(ship.vel,dt);
 
-  // FIRST-PERSON CAMERA: lock to nose; never see ship model
-  const eye = eyeLocal.clone().applyQuaternion(ship.quat);
-  camera.position.copy(ship.pos).add(eye);
-  camera.quaternion.copy(ship.quat);
+  // first-person: camera locked to ship nose
+  const eye=eyeLocal.clone().applyQuaternion(ship.quat);
+  camera.position.copy(ship.pos).add(eye); camera.quaternion.copy(ship.quat);
 
-  // follow (hidden) ship group so hardpoints transform correctly
+  // keep hidden ship group synced for hardpoints
   shipGroup.position.copy(ship.pos); shipGroup.quaternion.copy(ship.quat);
 
   // cooldowns
@@ -492,40 +444,23 @@ function loop(){
   ship.missile._cd=Math.max(0,ship.missile._cd-dt); ship.missile.heat=Math.max(0,ship.missile.heat-ship.missile.cooldown*dt); if(ship.missile.over&&ship.missile.heat<=35){ ship.missile.over=false; toast('Missiles ready'); }
 
   updateMissiles(dt); updateDrops(dt); updateFX(dt);
-
   sun.position.copy(ship.pos).add(new THREE.Vector3(1,0.2,0.3).multiplyScalar(30000));
-
   updateUI(); renderer.render(scene,camera); requestAnimationFrame(loop);
 }
+
+/* ---------- Quality / Seed ---------- */
+function setQuality(q){ quality=q; ui.qual.textContent=(q==='ultra')?'Ultra':'High'; buildWorld(seed); }
+function newSeed(){ seed=(seed*1664525+1013904223)>>>0; buildWorld(seed); }
 
 /* ---------- Boot ---------- */
 function onResize(){ renderer.setSize(innerWidth,innerHeight); camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); }
 addEventListener('resize',onResize);
-function buildWorld(s){
-  for(const b of LASER_BEAMS){ removeBeam(b); } LASER_BEAMS.length=0;
-  for(let i=MISSILES.length-1;i>=0;i--){ scene.remove(MISSILES[i].mesh); } MISSILES.length=0;
-  for(let i=FX.group.children.length-1;i>=0;i--){ const n=FX.group.children[i]; FX.group.remove(n); n.geometry?.dispose?.(); n.material?.dispose?.(); }
-  resetDrops(); buildAsteroids(s);
-  if(stars) scene.remove(stars); stars=makeStarfield(s^0x1234,6000,60000); scene.add(stars);
-  if(planetA) scene.remove(planetA); if(planetB) scene.remove(planetB);
-  planetA=makePlanet(4200,70000,0x1f2a7a); scene.add(planetA);
-  planetB=makePlanet(2600,110000,0x7a3f1f); scene.add(planetB);
-  ship.pos.set(0,0,0); ship.vel.set(0,0,0); ship.quat.identity();
-  ship.laser.heat=0; ship.laser.over=false; ship.laser._cd=0; ship.missile.heat=0; ship.missile.over=false; ship.missile._cd=0;
-  uiSeed.textContent=s; uiCap.textContent=ship.cargoCap; updateUI();
+function init(){
+  load(); ui.qual.textContent=(quality==='ultra')?'Ultra':'High'; ui.seed.textContent=seed; refreshShop();
+  scene.background=new THREE.Color(0x000000);
+  buildWorld(seed);
+  requestAnimationFrame(loop);
 }
-const LSKEY='astrominer_save_v1';
-function save(){ localStorage.setItem(LSKEY, JSON.stringify({seed,quality,credits:ship.credits,cargo:ship.cargo,upgrades})); }
-function load(){ try{ const j=localStorage.getItem(LSKEY); if(!j) return; const d=JSON.parse(j);
-  if(d.seed) seed=d.seed; if(d.quality) quality=d.quality; if(d.credits!=null) ship.credits=d.credits; if(d.cargo!=null) ship.cargo=d.cargo; if(d.upgrades) Object.assign(upgrades,d.upgrades);
-  ship.laser.dmg=50+(upgrades.laserD-1)*18; ship.laser.cooldown=30+(upgrades.laserC-1)*6; ship.laser.shotHeat=Math.max(8,18-(upgrades.laserC-1)*2);
-  ship.missile.dmg=240+(upgrades.missD-1)*80;
-  ship.thrust=36+(upgrades.thrust-1)*6; ship.strafe=28+(upgrades.thrust-1)*5; ship.lift=28+(upgrades.thrust-1)*5; ship.maxSpeed=280+(upgrades.thrust-1)*20;
-  ship.yawRate=rad(100+(upgrades.turn-1)*10); ship.pitchRate=rad(100+(upgrades.turn-1)*10); ship.rollRate=rad(180+(upgrades.turn-1)*18);
-  ship.cargoCap=100+(upgrades.magnet-1)*50; }catch(e){ console.warn('save load failed',e); } }
-function setQuality(q){ quality=q; uiQual.textContent=q==='ultra'?'Ultra':'High'; buildWorld(seed); }
-function newSeed(){ seed=(seed*1664525+1013904223)>>>0; buildWorld(seed); }
-function init(){ load(); uiQual.textContent=(quality==='ultra')?'Ultra':'High'; uiSeed.textContent=seed; refreshShop(); scene.background=new THREE.Color(0x000000); buildWorld(seed); requestAnimationFrame(loop); }
 init();
 </script>
 </body>
