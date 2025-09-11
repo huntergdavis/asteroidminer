@@ -760,21 +760,18 @@ function destroyAsteroid(rec){
 /* ---------- NPC: Trawlers ---------- */
 function makeTrawlerMesh(seed){
   const g=new THREE.Group();
-  // Hull
   const hull=new THREE.Mesh(
     new THREE.CapsuleGeometry(10,60,6,12),
     new THREE.MeshStandardMaterial({color:0x3a4d62, metalness:0.7, roughness:0.45})
   );
   hull.rotation.z=Math.PI/2;
   g.add(hull);
-  // Containers
   const podMat=new THREE.MeshStandardMaterial({color:0x7088a0, metalness:0.6, roughness:0.5});
   for(let i=0;i<6;i++){
     const pod=new THREE.Mesh(new THREE.BoxGeometry(12,10,10), podMat.clone());
     pod.position.set(-20+i*10, (i%2?12:-12), 0);
     g.add(pod);
   }
-  // Thrusters
   const tTex=makeGlowTexture(256,0.0,0.7,'rgba(120,200,255,1)');
   const t1=new THREE.Sprite(new THREE.SpriteMaterial({map:tTex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false,opacity:0.7}));
   const t2=t1.clone();
@@ -785,14 +782,12 @@ function makeTrawlerMesh(seed){
   return g;
 }
 function spawnTrawlers(){
-  // Clear old
   for(let i=TRAWLERS.length-1;i>=0;i--){ scene.remove(TRAWLERS[i].mesh); }
   TRAWLERS.length=0;
 
   const R=rng(seed^0x5151);
   const count = (quality==='ultra')?3:2;
   for(let i=0;i<count;i++){
-    // Pick a field different from origin to depart from
     const fIdx = 1 + Math.floor(R()*Math.max(1,FIELDS.length-1));
     const from = FIELDS[fIdx].center.clone();
     const to   = (R()<0.5)? STATION.pos.clone() : FIELDS[Math.floor(R()*FIELDS.length)].center.clone();
@@ -809,7 +804,6 @@ function spawnTrawlers(){
 function destroyTrawler(t){
   if(t.dying) return; t.dying=true;
   spawnExplosion(t.pos, 6);
-  // Big payout crates
   const n=8+Math.floor(Math.random()*8);
   for(let i=0;i<n;i++){
     const off=new THREE.Vector3(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5).multiplyScalar(40);
@@ -822,16 +816,13 @@ function destroyTrawler(t){
 }
 function updateTrawlers(dt){
   for(const t of TRAWLERS){
-    // Seek towards target
     const dir=t.to.clone().sub(t.pos); const dist=dir.length(); if(dist<80){
-      // Arrived: flip route and "sell" cargo → refill
       const tmp=t.from; t.from=t.to; t.to=tmp; t.cargo=300+Math.floor(Math.random()*600);
     } else {
       dir.normalize();
       t.vel.lerp(dir.multiplyScalar(t.speed), 0.6*dt);
       t.pos.addScaledVector(t.vel, dt);
       t.mesh.position.copy(t.pos);
-      // Face velocity
       const look = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1,0,0), t.vel.clone().normalize());
       if(isFinite(look.x)) t.mesh.quaternion.slerp(look, 0.15);
     }
@@ -855,13 +846,7 @@ function spawnExplosion(pos,scale){
   if(pct>0){ addShake(0.6*pct, 0.25+0.2*pct); AUD.boom(); screenFlash(0.12*pct); triggerKick(1.2*pct); }
 }
 
-/* ---- LASER BEAM FIX ----
-   Cause: transparent, additively blended cylinders were depth-tested against huge geometry
-   and sometimes clipped near the camera with near=1. We:
-   - lowered camera near to 0.3
-   - disable depthTest on beam materials and sprites
-   - set high renderOrder and disable frustum culling for the beams
-*/
+/* ---- LASER BEAM FIX ---- */
 function createLaserBeam(start,end){
   const dir=end.clone().sub(start), len=Math.max(0.001,dir.length()), dirN=dir.clone().normalize();
   const gCore=new THREE.CylinderGeometry(1.3,1.3,1,18,1,true);
@@ -940,6 +925,7 @@ function rayHitWorld(origin,dir,maxRange){
 }
 
 /* ---------- Weapons ---------- */
+function getReticleRay(){ const origin=camera.position.clone(); const dir=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).normalize(); return {origin,dir}; }
 function fireLaser(){
   const L=ship.laser; if(L.over||L._cd>0) return; L.heat+=L.shotHeat; if(L.heat>=100){ L.over=true; toast('Laser overheated!'); }
   L._cd=1/Math.max(3,ship.laser.rof);
@@ -952,7 +938,7 @@ function fireLaser(){
     if(pick.kind==='asteroid'){
       pick.rock.hp-=ship.laser.dmg; maybeChipLoot(endPoint); if(pick.rock.hp<=0) destroyAsteroid(pick.rock);
     } else if(pick.kind==='trawler'){
-      pick.ship.hp -= ship.laser.dmg*0.6; // lasers less effective vs hull
+      pick.ship.hp -= ship.laser.dmg*0.6;
       if(pick.ship.hp<=0) destroyTrawler(pick.ship);
     }
   }
@@ -969,9 +955,6 @@ function spawnMissile(dir){
   glow.scale.set(7,7,1); const group=new THREE.Group(); group.add(glow,core); group.position.copy(nose); scene.add(group);
   MISSILES.push({pos:nose.clone(),vel:dir.clone().multiplyScalar(180),life:10,mesh:group,trailT:0});
 }
-
-/* ---------- Ray / Aim ---------- */
-function getReticleRay(){ const origin=camera.position.clone(); const dir=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).normalize(); return {origin,dir}; }
 
 /* ---------- Station ---------- */
 const STATION={ group:null, pos:new THREE.Vector3(0,0,-11000), arm:null };
@@ -1033,7 +1016,6 @@ function updateScan(dt){
   SCAN.last+=dt; if(SCAN.last<0.75) return; SCAN.last=0;
   const maxPips=20 + upgrades.scan*12; ensurePips(maxPips);
   const center=ship.pos; const cand=[];
-  // include non-rocks (metals, crystals) and trawlers
   for(const a of AST.data){ if(!a.alive||a.type==='rock') continue;
     const dx=a.x-center.x, dy=a.y-center.y, dz=a.z-center.z; const d2=dx*dx+dy*dy+dz*dz; if(d2>ship.scannerRange*ship.scannerRange) continue; cand.push([d2,{x:a.x,y:a.y,z:a.z,size:a.size}]); }
   for(const s of TRAWLERS){ const dx=s.pos.x-center.x, dy=s.pos.y-center.y, dz=s.pos.z-center.z; const d2=dx*dx+dy*dy+dz*dz; if(d2>ship.scannerRange*ship.scannerRange) continue; cand.push([d2,{x:s.pos.x,y:s.pos.y,z:s.pos.z,size:s.radius*1.4}]); }
@@ -1157,12 +1139,10 @@ function updateFPS(dt){ if(!fpsOn || paused) return; fpsAccum+=dt; fpsFrames++; 
 function handleInput(dt){
   if(paused) return;
 
-  // Keyboard yaw/pitch/roll
   let yaw=((keys['KeyA']?1:0)-(keys['KeyD']?1:0))*ship.yawRate*dt;
   let pitch=((keys['KeyW']?1:0)-(keys['KeyS']?1:0))*ship.pitchRate*dt;
   let roll=((keys['KeyQ']?1:0)-(keys['KeyE']?1:0))*ship.rollRate*dt;
 
-  // Mouse contributions
   if(Settings.mouseAim && MOUSE.locked){
     if(MOUSE.mmb){ roll += MOUSE.roll; } else { yaw += MOUSE.yaw; }
     pitch += MOUSE.pitch;
@@ -1223,6 +1203,30 @@ function updateMissiles(dt){
     else if(m.life<=0){ scene.remove(m.mesh); MISSILES.splice(i,1); }
   }
 }
+
+/* ---- MISSING IN PREVIOUS DROP: updateDrops(dt) ---- */
+function updateDrops(dt){
+  for(let i=0;i<DROPS.count;i++){
+    const d=DROPS.data[i]; if(!d||!d.alive) continue;
+    d.pos.addScaledVector(d.vel,dt); d.vel.multiplyScalar(0.992);
+    if(d.flare){ d.flare.position.copy(d.pos); d.flare.scale.setScalar(Math.min(32,d.scale*1.8)); }
+    const toShip=ship.pos.clone().sub(d.pos); const dist=toShip.length();
+    const magnetBase = 30 + (upgrades.magnet-1)*12;
+    const range = magnetBase + d.scale*5.0;
+    if(dist<range){ d.vel.add(toShip.normalize().multiplyScalar(((magnetBase*1.4)+d.scale)*dt)); }
+    const pickupR = 6 + d.scale*0.6;
+    if(dist<pickupR){
+      d.alive=false; ship.credits+=d.value; ship.cargo=Math.min(ship.cargoCap,ship.cargo+1); toast('+'+d.value+' cr'); AUD.pickup();
+      const mtx=new THREE.Matrix4().compose(new THREE.Vector3(999999,999999,999999),new THREE.Quaternion(),new THREE.Vector3(0.0001,0.0001,0.0001));
+      DROPS.inst.setMatrixAt(i,mtx); DROPS.inst.instanceMatrix.needsUpdate=true; if(d.flare){ scene.remove(d.flare); d.flare.material.dispose(); }
+      updateUI(); save();
+    } else {
+      const mtx=new THREE.Matrix4().compose(d.pos,new THREE.Quaternion(),new THREE.Vector3(d.scale,d.scale,d.scale));
+      DROPS.inst.setMatrixAt(i,mtx); DROPS.inst.instanceMatrix.needsUpdate=true;
+    }
+  }
+}
+
 function updateFX(dt){
   for(let i=FX.group.children.length-1;i>=0;i--){
     const s=FX.group.children[i]; s.userData.t=(s.userData.t||0)+dt; const t=s.userData.t/(s.userData.life||0.35);
