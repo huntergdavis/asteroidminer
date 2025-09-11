@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>AstroMiner — Loading • Working Shop • Stable Auto‑Level • Better Rocks</title>
+<title>AstroMiner — Stable Depth • No Reticle Flicker • Target Ring</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   :root{
@@ -42,6 +42,8 @@
     radial-gradient(ellipse at center, rgba(255,255,255,.14), rgba(0,0,0,0) 60%);z-index:3}
 
   .fps{position:absolute;right:10px;bottom:10px;background:rgba(0,0,0,.55);padding:8px 10px;border-radius:10px;font:12px/1.2 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:none;z-index:6}
+
+  .tgtHud{position:absolute;left:50%;top:50%;transform:translate(-50%,calc(-50% + 42px));font-size:12px;opacity:.9;background:rgba(0,0,0,.35);padding:4px 6px;border-radius:6px;z-index:5;pointer-events:none;display:none}
 
   /* Loading overlay */
   .loading{position:fixed;inset:0;background:radial-gradient(ellipse at center,#0a0f1a 10%,#000 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#cfe6ff;z-index:10}
@@ -84,13 +86,14 @@
 
 <div class="help">
   <div><b>Controls</b> — Zero-G 6-DOF</div>
-  <div>Pitch: <b>W/S</b> (direct up/down) · Yaw: <b>A/D</b> · Roll: <b>Q/E</b></div>
+  <div>Pitch: <b>W/S</b> · Yaw: <b>A/D</b> · Roll: <b>Q/E</b></div>
   <div>Forward/Reverse: <b>↑/↓</b> · Strafe: <b>←/→</b> · Lift: <b>R/F</b></div>
   <div>Brake/Damp: <b>Z</b> · Laser: <b>Space</b> · Missile: <b>X</b> · Dock: <b>C</b> · Auto‑Level: <b>L</b> · FPS: <b>Shift+F</b></div>
 </div>
 
 <!-- Reticle -->
 <div class="ret"><div class="ring"></div><div class="lines"></div></div>
+<div class="tgtHud" id="tgtHud">—</div>
 
 <div class="flash" id="flash"></div>
 <div class="fps" id="fps">—</div>
@@ -118,9 +121,14 @@ function rng(seed){ let s=seed>>>0; return ()=>{ s+=0x6D2B79F5; let t=Math.imul(
 /* ---------- Scene ---------- */
 const app=document.getElementById('app');
 const scene=new THREE.Scene();
-const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,0.1,240000);
+// Near=1 greatly improves depth precision. Log depth handles the long far range.
+const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,1,240000);
 camera.position.set(0,0,0);
-const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});
+const renderer=new THREE.WebGLRenderer({
+  antialias:true, alpha:false,
+  logarithmicDepthBuffer:true,
+  powerPreference:'high-performance'
+});
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth,innerHeight);
 app.appendChild(renderer.domElement);
@@ -169,8 +177,11 @@ async function makeStarfieldAsync(seed, count, spread=90000, progress){
       pos[i*3+2]=r*s*Math.sin(th);
       if((i&1023)===0){ progress && progress(`${label} ${Math.floor(i/n*100)}%`); await nextFrame(); }
     }
-    geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
-    const mat=new THREE.PointsMaterial({size, color:0xffffff, sizeAttenuation:true, transparent:true, opacity:0.9, depthWrite:false});
+    const mat=new THREE.PointsMaterial({
+      size, color:0xffffff, sizeAttenuation:true,
+      transparent:false,       // avoid transparent object sorting
+      depthWrite:false         // but keep it cheap
+    });
     const pts=new THREE.Points(geo,mat);
     pts.frustumCulled=false;
     group.add(pts);
@@ -226,6 +237,7 @@ const ui={
   ref:byId('uiRef'),
   flash:byId('flash'),
   fps:byId('fps'),
+  tgtHud:byId('tgtHud'),
   loading:byId('loading'), loadText:byId('loadText'), loadSub:byId('loadSub'), loadBar:byId('loadBar'),
   buttons:{
     buyLaserD:byId('buyLaserD'), buyLaserC:byId('buyLaserC'), buyMissD:byId('buyMissD'),
@@ -363,13 +375,13 @@ function refreshShop(){
   B.buyTurn.textContent   = (upgrades.turn  >=MAX.turn  )?'MAX':'Buy ('+cTurn+')';
   B.buyMag.textContent    = (upgrades.magnet>=MAX.magnet)?'MAX':'Buy ('+cMag+')';
 
-  const setUnlock=(key,btn,price,label)=>{
+  const setUnlock=(key,btn,price)=>{
     if(upgrades[key]){ btn.textContent='Unlocked'; btn.disabled=true; }
     else { btn.textContent=`Unlock (${price})`; btn.disabled=(ship.credits<price); }
   };
-  setUnlock('lightning', B.unlockLightning, unlockPrices.lightning, 'Lightning Beam');
-  setUnlock('mass',      B.unlockMass,      unlockPrices.mass,      'Mass Driver');
-  setUnlock('grav',      B.unlockGrav,      unlockPrices.grav,      'Gravity Gun');
+  setUnlock('lightning', B.unlockLightning, unlockPrices.lightning);
+  setUnlock('mass',      B.unlockMass,      unlockPrices.mass);
+  setUnlock('grav',      B.unlockGrav,      unlockPrices.grav);
 }
 
 function bindShop(){
@@ -412,25 +424,15 @@ const RES_KINDS=[{name:'Iron',val:8,color:0xa0a8b8},{name:'Nickel',val:10,color:
 const lootColorForSize = sz => (sz>18?0xffd54a:sz>12?0xd9d9ff:sz>8?0xc0c0ff:0xa0a8b8);
 
 /* ---------- Better Rock Geometry ---------- */
-function hash3(x,y,z){ // deterministic pseudo noise
-  return (Math.sin(x*127.1 + y*311.7 + z*74.7)*43758.5453)%1;
-}
-function fbm3(x,y,z,oct=3){
-  let a=0, amp=1, freq=1;
-  for(let i=0;i<oct;i++){
-    a+= (hash3(x*freq,y*freq,z*freq)*2-1)*amp;
-    freq*=2.07; amp*=0.55;
-  }
-  return a;
-}
+function hash3(x,y,z){ return (Math.sin(x*127.1 + y*311.7 + z*74.7)*43758.5453)%1; }
+function fbm3(x,y,z,oct=3){ let a=0, amp=1, freq=1; for(let i=0;i<oct;i++){ a+= (hash3(x*freq,y*freq,z*freq)*2-1)*amp; freq*=2.07; amp*=0.55; } return a; }
 function makeRockGeometry(seed,scale=1){
   const g=new THREE.IcosahedronGeometry(scale,1);
   const pos=g.attributes.position;
   for(let i=0;i<pos.count;i++){
     const vx=pos.getX(i),vy=pos.getY(i),vz=pos.getZ(i);
-    const v=new THREE.Vector3(vx,vy,vz);
-    const n=v.clone().normalize();
-    const d = fbm3(vx+seed*0.001,vy-seed*0.002,vz+seed*0.003,4); // jaggedness
+    const v=new THREE.Vector3(vx,vy,vz), n=v.clone().normalize();
+    const d = fbm3(vx+seed*0.001,vy-seed*0.002,vz+seed*0.003,4);
     const push = (d*0.35) + (Math.random()-0.5)*0.08;
     v.addScaledVector(n,push);
     pos.setXYZ(i,v.x,v.y,v.z);
@@ -439,15 +441,13 @@ function makeRockGeometry(seed,scale=1){
   return g;
 }
 
-/* ---------- Build Asteroids (async with progress) ---------- */
+/* ---------- Build Asteroids (async) ---------- */
 async function buildAsteroidsAsync(seed, progress){
-  // dispose old
   AST.inst.forEach(im=>{ scene.remove(im); im.geometry.dispose(); im.material.dispose(); });
   AST.inst=[]; AST.data=[]; AST.count=0; AST.geo=[];
   const count=(quality==='ultra')?1600:900;
   AST.geo=[ makeRockGeometry(seed^0x1111,1.0), makeRockGeometry(seed^0x2222,1.25), makeRockGeometry(seed^0x3333,0.85) ];
 
-  // Material with subtle rim via onBeforeCompile
   AST.mat=new THREE.MeshStandardMaterial({color:0x8a929c, roughness:0.97, metalness:0.03, vertexColors:true, flatShading:true});
   AST.mat.onBeforeCompile = (shader)=>{
     shader.fragmentShader = shader.fragmentShader.replace(
@@ -471,6 +471,7 @@ async function buildAsteroidsAsync(seed, progress){
     const n=per[gi], inst=new THREE.InstancedMesh(AST.geo[gi],AST.mat,n);
     inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     inst.frustumCulled=false;
+    inst.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(n*3),3);
     scene.add(inst); AST.inst.push(inst);
     for(let i=0;i<n;i++){
       const a=R()*Math.PI*2, r=beltR+(R()*2-1)*beltW, x=Math.cos(a)*r, z=Math.sin(a)*r, y=(R()*2-1)*beltH;
@@ -478,14 +479,13 @@ async function buildAsteroidsAsync(seed, progress){
       const rot=new THREE.Quaternion().setFromEuler(new THREE.Euler(R()*Math.PI,R()*Math.PI,R()*Math.PI));
       const m=new THREE.Matrix4(); m.compose(new THREE.Vector3(x,y,z),rot,new THREE.Vector3(size,size,size));
       inst.setMatrixAt(i,m);
-      // per-instance color variation (cool slate → warm slate)
       const col=new THREE.Color().setHSL(0.60+R()*0.06, 0.12+R()*0.10, 0.58+R()*0.10);
       inst.setColorAt(i,col);
       AST.data.push({x,y,z,size,hp,alive:true,gi,idx:i}); AST.count++; built++;
       if((i&255)===0){ progress && progress(`Rocks ${Math.floor(built/count*100)}%`); await nextFrame(); }
     }
     inst.instanceMatrix.needsUpdate=true;
-    if(inst.instanceColor) inst.instanceColor.needsUpdate=true;
+    inst.instanceColor.needsUpdate=true;
   }
 }
 
@@ -507,11 +507,12 @@ const glowTexLoot=makeGlowTexture(128,0.0,0.55,'rgba(255,240,140,1)');
 function spawnDrop(pos,value,color,scale=1.4){
   if(DROPS.count>=DROPS.cap) return;
   const id=DROPS.count++, vel=new THREE.Vector3((Math.random()-0.5)*3,(Math.random()-0.5)*3,(Math.random()-0.5)*3);
+  // IMPORTANT: depthTest=true so flares occlude properly (prevents “meteor blink” in reticle)
   const flare=new THREE.Sprite(new THREE.SpriteMaterial({
     map:glowTexLoot, transparent:true, blending:THREE.AdditiveBlending,
-    depthWrite:false, depthTest:false, opacity:0.9, color:new THREE.Color(color)
+    depthWrite:false, depthTest:true, opacity:0.9, color:new THREE.Color(color)
   }));
-  flare.renderOrder = 5;
+  flare.renderOrder = 1;
   flare.position.copy(pos); flare.scale.setScalar(Math.min(32,scale*1.8)); scene.add(flare);
   DROPS.data[id]={pos:pos.clone(),vel,value,alive:true,color,scale,flare};
   const m=new THREE.Matrix4(); m.compose(DROPS.data[id].pos,new THREE.Quaternion(),new THREE.Vector3(scale,scale,scale));
@@ -682,9 +683,31 @@ function updateUI(){
   refreshShop();
 }
 
+/* ---------- Target indicator ---------- */
+const TARGET={ sprite:null, rock:null };
+function ensureTargetSprite(){
+  if(TARGET.sprite) return;
+  const tex=makeGlowTexture(256,0.6,1.0,'rgba(120,255,180,1)');
+  const mat=new THREE.SpriteMaterial({map:tex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,depthTest:true,opacity:0.9});
+  const sp=new THREE.Sprite(mat);
+  sp.visible=false;
+  scene.add(sp);
+  TARGET.sprite=sp;
+}
+function showTarget(rock){
+  ensureTargetSprite();
+  if(!rock){ TARGET.sprite.visible=false; ui.tgtHud.style.display='none'; return; }
+  TARGET.rock=rock;
+  TARGET.sprite.visible=true;
+  TARGET.sprite.position.set(rock.x,rock.y,rock.z);
+  TARGET.sprite.scale.setScalar(rock.size*3.0);
+  ui.tgtHud.style.display='block';
+  ui.tgtHud.textContent = `Asteroid  ·  ${Math.max(0,rock.hp|0)} HP  ·  ${camera.position.distanceTo(new THREE.Vector3(rock.x,rock.y,rock.z)).toFixed(0)} m`;
+}
+
 /* ---------- Loop ---------- */
 const clock=new THREE.Clock();
-let retTmr=0, retHit=false;
+let retTmr=0, retHit=false, currentTarget=null;
 function addShake(amp,t){ shakeAmp=Math.max(shakeAmp,amp); shakeT=Math.max(shakeT,t); }
 function applyCameraShake(dt){
   if(shakeT>0){
@@ -694,7 +717,15 @@ function applyCameraShake(dt){
 }
 function updateScreenFX(dt){
   // reticle hit probe (throttled)
-  retTmr-=dt; if(retTmr<=0){ retTmr=0.05; const {origin,dir}=getReticleRay(); const pick=rayHitAsteroids(origin,dir,ship.range); retHit=pick.hit; }
+  retTmr-=dt;
+  if(retTmr<=0){
+    retTmr=0.05;
+    const {origin,dir}=getReticleRay();
+    const pick=rayHitAsteroids(origin,dir,ship.range);
+    retHit=pick.hit;
+    currentTarget = pick.hit ? pick.rock : null;
+    showTarget(currentTarget);
+  }
   const root=document.documentElement.style;
   if(retHit){
     root.setProperty('--ret','rgba(120,255,180,.95)');
@@ -729,29 +760,27 @@ function updateFPS(dt){
   }
 }
 
-// Stable Auto‑Level: critically damped roll trim with dead‑zone
+// Stable Auto‑Level
 function stableAutoLevel(dt){
   if(!autoLevel || keys['KeyQ'] || keys['KeyE']) return;
   const fwd=new THREE.Vector3(0,0,-1).applyQuaternion(ship.quat).normalize();
   const up =new THREE.Vector3(0,1,0).applyQuaternion(ship.quat).normalize();
   const worldUp=new THREE.Vector3(0,1,0);
 
-  // Desired right from world up projected against forward
   const desiredRight = new THREE.Vector3().crossVectors(fwd, worldUp);
   const len = desiredRight.length();
-  if(len<1e-3) return; // near singularity (looking straight up/down)
+  if(len<1e-3) return;
   desiredRight.divideScalar(len);
   const desiredUp = new THREE.Vector3().crossVectors(desiredRight, fwd).normalize();
 
   const right = new THREE.Vector3(1,0,0).applyQuaternion(ship.quat).normalize();
-  // Roll error around forward axis
   const rollErr = Math.atan2( right.dot(desiredUp), right.dot(desiredRight) );
 
-  const dead = rad(0.7); // dead‑zone to kill jitter
+  const dead = rad(0.7);
   if(Math.abs(rollErr) < dead) return;
 
-  const Kp = 3.2;                 // proportional gain
-  const maxRate = rad(60);        // deg/s clamp
+  const Kp = 3.2;
+  const maxRate = rad(60);
   const rate = THREE.MathUtils.clamp(-Kp*rollErr, -maxRate, maxRate);
   const trim = rate * dt;
   const qTrim=new THREE.Quaternion().setFromAxisAngle(fwd, trim);
@@ -767,7 +796,7 @@ function handleInput(dt){
   const qRoll=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),-roll);
   ship.quat.multiply(qYaw).multiply(qPitch).multiply(qRoll).normalize();
 
-  stableAutoLevel(dt); // apply after player input
+  stableAutoLevel(dt);
 
   const fwd=new THREE.Vector3(0,0,-1).applyQuaternion(ship.quat);
   const up =new THREE.Vector3(0,1,0).applyQuaternion(ship.quat);
