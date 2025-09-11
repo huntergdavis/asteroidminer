@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>AstroMiner — Multi‑Fields • Station Docking • Options Menu</title>
+<title>AstroMiner — Field Start • Stable Nav • Closer Station</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   :root{
@@ -27,7 +27,7 @@
   .bar>span.warn{animation:blink .35s linear infinite alternate}
   @keyframes blink{from{filter:brightness(1)}to{filter:brightness(2.1)}}
   .cash{font-weight:700}
-  .help{position:absolute;left:10px;bottom:10px;background:rgba(0,0,0,.45);padding:8px 10px;border-radius:10px;font-size:12px;max-width:820px;z-index:5}
+  .help{position:absolute;left:10px;bottom:10px;background:rgba(0,0,0,.45);padding:8px 10px;border-radius:10px;font-size:12px;max-width:860px;z-index:5}
   .toast{position:absolute;left:50%;transform:translateX(-50%);top:10px;background:rgba(0,0,0,.5);padding:6px 10px;border-radius:10px;font-size:12px;display:none;z-index:10}
   .err{position:absolute;right:10px;bottom:10px;background:#300;color:#fee;padding:8px 10px;border-radius:10px;max-width:60ch;display:none;white-space:pre-wrap;z-index:10}
 
@@ -45,7 +45,7 @@
 
   .tgtHud{position:absolute;left:50%;top:50%;transform:translate(-50%,calc(-50% + 42px));font-size:12px;opacity:.9;background:rgba(0,0,0,.35);padding:4px 6px;border-radius:6px;z-index:5;pointer-events:none;display:none}
 
-  /* Nav HUD to station */
+  /* Nav HUD */
   .nav{position:absolute;left:50%;top:20px;transform:translate(-50%,0);display:none;align-items:center;gap:6px;background:rgba(0,0,0,.35);padding:4px 6px;border-radius:8px;font-size:12px;z-index:6;pointer-events:none}
   .navArrow{width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:12px solid #7fffd4;transform-origin:50% 60%;}
   .navLbl{opacity:.9}
@@ -67,10 +67,8 @@
   .btn.sec{background:#2a394f}
   .muted{opacity:.75}
 
-  /* Docking header inside modal */
   .dockStats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:8px 0 10px 0;font-size:12px}
   .statBox{background:#0b1220;border:1px solid #1b2a46;border-radius:8px;padding:6px}
-
 </style>
 </head>
 <body>
@@ -106,15 +104,15 @@
   <div class="row"><span class="k">Mass Driver</span><button id="unlockMass">Locked (900)</button></div>
   <div class="row"><span class="k">Gravity Gun</span><button id="unlockGrav">Locked (1500)</button></div>
   <div style="margin-top:6px;opacity:.75">
-    Toggle shop: <b>U</b> · Quality: <b>1</b>=High, <b>2</b>=Ultra · New Seed: <b>N</b> · Auto‑Level: <b>L</b> · Boost: <b>Shift</b> · FPS: <b>Shift+F</b>
+    Shop: <b>U</b> · Quality: <b>1</b>/<b>2</b> · New Seed: <b>N</b> · Auto‑Level: <b>L</b> · Boost: <b>Shift</b> · FPS: <b>Shift+F</b>
   </div>
 </div>
 
 <div class="help">
-  <div><b>Controls</b> — Zero-G 6-DOF</div>
+  <div><b>Controls</b> — Zero‑G 6‑DOF</div>
   <div>Pitch: <b>W/S</b> · Yaw: <b>A/D</b> · Roll: <b>Q/E</b></div>
   <div>Forward/Reverse: <b>↑/↓</b> · Strafe: <b>←/→</b> · Lift: <b>R/F</b> · Boost: <b>Shift</b></div>
-  <div>Brake/Damp: <b>Z</b> · Laser: <b>Space</b> · Missile: <b>X</b> · Dock (station): <b>C</b> · Options: <b>O</b>/<b>Esc</b></div>
+  <div>Brake/Damp: <b>Z</b> · Laser: <b>Space</b> · Missile: <b>X</b> · Dock: <b>C</b> · Options: <b>O</b>/<b>Esc</b> · <b>Cycle Nav Target: H</b></div>
 </div>
 
 <!-- Reticle -->
@@ -122,7 +120,7 @@
 <div class="tgtHud" id="tgtHud">—</div>
 
 <!-- Nav HUD -->
-<div class="nav" id="nav"><div class="navArrow" id="navArrow"></div><div class="navLbl">STATION <span id="navDist">—</span> m</div></div>
+<div class="nav" id="nav"><div class="navArrow" id="navArrow"></div><div class="navLbl"><span id="navName">STATION</span> <span id="navDist">—</span> m</div></div>
 
 <div class="flash" id="flash"></div>
 <div class="fps" id="fps">—</div>
@@ -145,7 +143,7 @@
   </div>
 </div>
 
-<!-- Docking Modal (opens when docked) -->
+<!-- Docking Modal -->
 <div class="modalMask" id="dockMask">
   <div class="modal">
     <h3>Docked at Orbital Station</h3>
@@ -159,7 +157,6 @@
       <button class="btn" id="dockRefine">Refine & Sell Cargo</button>
       <button class="btn sec" id="dockUndock">Undock</button>
     </div>
-    <!-- Show the same shop panel while docked -->
     <div id="dockShopMount"></div>
   </div>
 </div>
@@ -216,7 +213,7 @@ const ui={
   flash:byId('flash'),
   fps:byId('fps'),
   tgtHud:byId('tgtHud'),
-  nav:byId('nav'), navArrow:byId('navArrow'), navDist:byId('navDist'),
+  nav:byId('nav'), navArrow:byId('navArrow'), navDist:byId('navDist'), navName:byId('navName'),
   loading:byId('loading'), loadText:byId('loadText'), loadSub:byId('loadSub'), loadBar:byId('loadBar'),
   optMask:byId('optMask'), dockMask:byId('dockMask'),
   dsCredits:byId('dsCredits'), dsCargo:byId('dsCargo'), dsSpeed:byId('dsSpeed'),
@@ -248,22 +245,21 @@ const keys={};
 let fpsOn=false, paused=false, pauseReason=null;
 function setPaused(p, reason=null){
   paused=p; pauseReason=reason;
-  if(p){ ui.fps.style.display='none'; } // keep it simple
+  if(p){ ui.fps.style.display='none'; }
 }
 function toggleFPS(){ fpsOn=!fpsOn; if(!paused) ui.fps.style.display=fpsOn?'block':'none'; }
 
 addEventListener('keydown',e=>{
   if(e.code==='KeyF' && e.shiftKey){ toggleFPS(); e.preventDefault(); return; }
-
   keys[e.code]=true;
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
   if(e.code==='Digit1') setQuality('high');
   if(e.code==='Digit2') setQuality('ultra');
   if(e.code==='KeyN')  newSeed();
   if(e.code==='KeyU'){ ui.shop.style.display = (ui.shop.style.display==='none'?'block':'none'); }
-
   if(e.code==='KeyL')  { autoLevel=!autoLevel; toast('Auto-Level: '+(autoLevel?'ON':'OFF')); updateOptionsMirror(); }
   if(e.code==='KeyO' || e.code==='Escape'){ openOptions(); }
+  if(e.code==='KeyH'){ NAV.nextTarget(); }
 
   if(AUD._ctx && AUD._ctx.state==='suspended') AUD._ctx.resume();
   if(!AUD._ctx) AUD.init();
@@ -271,12 +267,8 @@ addEventListener('keydown',e=>{
 addEventListener('keyup',e=>{ keys[e.code]=false; });
 
 /* ---------- Audio with toggle ---------- */
-const Settings = {
-  sfx:true, autoLevel:true, fov:75, quality:'high'
-};
-function loadSettings(){
-  try{ const j=localStorage.getItem('astrominer_settings'); if(j){ Object.assign(Settings, JSON.parse(j)); } }catch{}
-}
+const Settings = { sfx:true, autoLevel:true, fov:75, quality:'high' };
+function loadSettings(){ try{ const j=localStorage.getItem('astrominer_settings'); if(j){ Object.assign(Settings, JSON.parse(j)); } }catch{} }
 function saveSettings(){ localStorage.setItem('astrominer_settings', JSON.stringify(Settings)); }
 
 const AUD={
@@ -308,15 +300,8 @@ function updateOptionsMirror(){
   ui.optQual.textContent= (quality==='ultra')?'Ultra':'High';
   ui.optFovVal.textContent = String(baseFov);
 }
-function openOptions(){
-  setPaused(true,'options');
-  ui.optMask.style.display='flex';
-  updateOptionsMirror();
-}
-function closeOptions(){
-  ui.optMask.style.display='none';
-  if(pauseReason==='options'){ setPaused(false,null); if(fpsOn) ui.fps.style.display='block'; }
-}
+function openOptions(){ setPaused(true,'options'); ui.optMask.style.display='flex'; updateOptionsMirror(); }
+function closeOptions(){ ui.optMask.style.display='none'; if(pauseReason==='options'){ setPaused(false,null); if(fpsOn) ui.fps.style.display='block'; } }
 ui.optSfx.addEventListener('click',()=>{ Settings.sfx=!Settings.sfx; saveSettings(); updateOptionsMirror(); toast('SFX '+(Settings.sfx?'On':'Off')); });
 ui.optAL.addEventListener('click',()=>{ autoLevel=!autoLevel; Settings.autoLevel=autoLevel; saveSettings(); updateOptionsMirror(); });
 ui.optQual.addEventListener('click',()=>{ setQuality(quality==='ultra'?'high':'ultra'); updateOptionsMirror(); });
@@ -341,83 +326,57 @@ let baseFov=75, fovKick=0, flashAmt=0, shakeT=0, shakeAmp=0;
 
 const shipGroup=new THREE.Group(); scene.add(shipGroup); shipGroup.visible=false;
 const HP_LOCAL = { laserL:new THREE.Vector3(-0.9,0.55,-1.6), laserR:new THREE.Vector3(0.9,0.55,-1.6), missile:new THREE.Vector3(0,-0.05,-1.9) };
-const eyeLocal = new THREE.Vector3(0,0.18,0);
+const eyeLocal = new THREE.Vector3(0,0,0); // a touch tighter in the field
 function hardpointWorld(local){ return local.clone().applyQuaternion(ship.quat).add(ship.pos); }
 
 /* ---------- Upgrades & Shop ---------- */
-const upgrades={
-  laserD:1, laserC:1, rof:1, missD:1, thrust:1, turn:1, magnet:1,
-  range:1, hold:1, yield:1, boost:1, scan:1,
-  lightning:false, mass:false, grav:false
-};
+const upgrades={ laserD:1, laserC:1, rof:1, missD:1, thrust:1, turn:1, magnet:1, range:1, hold:1, yield:1, boost:1, scan:1, lightning:false, mass:false, grav:false };
 const baseCosts={ laserD:200, laserC:150, rof:240, missD:300, thrust:250, turn:200, magnet:180, range:260, hold:220, yield:300, boost:280, scan:230 };
 const MAX={ laserD:8, laserC:8, rof:7, missD:8, thrust:8, turn:8, magnet:8, range:8, hold:8, yield:6, boost:6, scan:6 };
-const unlockPrices={ lightning:1200, mass:900, grav:1500 };
-
 function levelCost(base,lv){ return Math.round(base * Math.pow(1.6, lv-1)); }
 function applyUpgrades(){
   ship.laser.dmg=50+(upgrades.laserD-1)*18;
   ship.laser.cooldown=30+(upgrades.laserC-1)*6;
   ship.laser.shotHeat=Math.max(8,18-(upgrades.laserC-1)*2);
   ship.laser.rof = 10 + (upgrades.rof-1)*2;
-
   ship.missile.dmg=240+(upgrades.missD-1)*80;
-
-  ship.thrust = 48 + (upgrades.thrust-1)*7;
-  ship.strafe = 36 + (upgrades.thrust-1)*6;
-  ship.lift   = 36 + (upgrades.thrust-1)*6;
+  ship.thrust = 48 + (upgrades.thrust-1)*7; ship.strafe = 36 + (upgrades.thrust-1)*6; ship.lift = 36 + (upgrades.thrust-1)*6;
   ship.maxSpeed = 300 + (upgrades.thrust-1)*24;
-
-  ship.yawRate  = rad(100+(upgrades.turn-1)*10);
-  ship.pitchRate= rad(100+(upgrades.turn-1)*10);
-  ship.rollRate = rad(180+(upgrades.turn-1)*18);
-
+  ship.yawRate=rad(100+(upgrades.turn-1)*10); ship.pitchRate=rad(100+(upgrades.turn-1)*10); ship.rollRate=rad(180+(upgrades.turn-1)*18);
   ship.cargoCap = 100 + (upgrades.hold-1)*80;
   ship.range = 3800 + (upgrades.range-1)*420;
   ship.scannerRange = 4200 + (upgrades.scan-1)*1400;
-
-  ship.boost.cap = 2.0 + (upgrades.boost-1)*0.9;
-  ship.boost.regen = 0.55 + (upgrades.boost-1)*0.25;
-  ship.boost.mult = 2.1 + (upgrades.boost-1)*0.12;
-  ship.boost.val = Math.min(ship.boost.val, ship.boost.cap);
+  ship.boost.cap = 2.0 + (upgrades.boost-1)*0.9; ship.boost.regen = 0.55 + (upgrades.boost-1)*0.25; ship.boost.mult = 2.1 + (upgrades.boost-1)*0.12; ship.boost.val = Math.min(ship.boost.val, ship.boost.cap);
 }
 
 /* ---------- Shop wiring ---------- */
 function refreshShop(){
-  ui.lvLaserD.textContent=upgrades.laserD; ui.lvLaserC.textContent=upgrades.laserC; ui.lvMissD.textContent=upgrades.missD;
-  ui.lvThrust.textContent=upgrades.thrust; ui.lvTurn.textContent=upgrades.turn; ui.lvMag.textContent=upgrades.magnet;
-  ui.lvRange.textContent=upgrades.range; ui.lvHold.textContent=upgrades.hold; ui.lvYield.textContent=upgrades.yield;
-  ui.lvRof.textContent=upgrades.rof; ui.lvBoost.textContent=upgrades.boost; ui.lvScan.textContent=upgrades.scan;
-  const c={}; for(const k of Object.keys(baseCosts)) c[k]=levelCost(baseCosts[k], upgrades[k]+1);
-  ui.costLaserD.textContent=c.laserD; ui.costLaserC.textContent=c.laserC; ui.costMissD.textContent=c.missD;
-  ui.costThrust.textContent=c.thrust; ui.costTurn.textContent=c.turn; ui.costMag.textContent=c.magnet;
-  ui.costRange.textContent=c.range; ui.costHold.textContent=c.hold; ui.costYield.textContent=c.yield;
-  ui.costRof.textContent=c.rof; ui.costBoost.textContent=c.boost; ui.costScan.textContent=c.scan;
-  const can=(k)=>ship.credits>=c[k] && upgrades[k]<MAX[k];
-  const B=ui.buttons;
-  B.buyLaserD.disabled=!can('laserD'); B.buyLaserC.disabled=!can('laserC'); B.buyMissD.disabled=!can('missD');
-  B.buyThrust.disabled=!can('thrust'); B.buyTurn.disabled=!can('turn'); B.buyMag.disabled=!can('magnet');
-  B.buyRange.disabled=!can('range'); B.buyHold.disabled=!can('hold'); B.buyYield.disabled=!can('yield');
-  B.buyRof.disabled=!can('rof'); B.buyBoost.disabled=!can('boost'); B.buyScan.disabled=!can('scan');
-  const capText=(k)=> (upgrades[k]>=MAX[k])?'MAX':'Buy ('+c[k]+')';
-  B.buyLaserD.textContent=capText('laserD'); B.buyLaserC.textContent=capText('laserC'); B.buyMissD.textContent=capText('missD');
-  B.buyThrust.textContent=capText('thrust'); B.buyTurn.textContent=capText('turn'); B.buyMag.textContent=capText('magnet');
-  B.buyRange.textContent=capText('range'); B.buyHold.textContent=capText('hold'); B.buyYield.textContent=capText('yield');
-  B.buyRof.textContent=capText('rof'); B.buyBoost.textContent=capText('boost'); B.buyScan.textContent=capText('scan');
+  const C=ui.buttons, cVals={}, set=(k)=>cVals[k]=levelCost(baseCosts[k], upgrades[k]+1);
+  ['laserD','laserC','rof','missD','thrust','turn','magnet','range','hold','yield','boost','scan'].forEach(set);
+  ['laserD','laserC','missD','thrust','turn','magnet','range','hold','yield','rof','boost','scan'].forEach(k=>{
+    const id=('lv'+(k[0].toUpperCase()+k.slice(1))).replace('Magnet','Mag');
+    byId(id).textContent=upgrades[k];
+  });
+  ui.costLaserD.textContent=cVals.laserD; ui.costLaserC.textContent=cVals.laserC; ui.costMissD.textContent=cVals.missD;
+  ui.costThrust.textContent=cVals.thrust; ui.costTurn.textContent=cVals.turn; ui.costMag.textContent=cVals.magnet;
+  ui.costRange.textContent=cVals.range; ui.costHold.textContent=cVals.hold; ui.costYield.textContent=cVals.yield;
+  ui.costRof.textContent=cVals.rof; ui.costBoost.textContent=cVals.boost; ui.costScan.textContent=cVals.scan;
+  const can=(k)=>ship.credits>=cVals[k] && upgrades[k]<MAX[k];
+  const capText=(k)=> (upgrades[k]>=MAX[k])?'MAX':'Buy ('+cVals[k]+')';
+  const setBtn=(btn,key)=>{ btn.disabled=!can(key); btn.textContent=capText(key); };
+  setBtn(ui.buttons.buyLaserD,'laserD'); setBtn(ui.buttons.buyLaserC,'laserC'); setBtn(ui.buttons.buyMissD,'missD');
+  setBtn(ui.buttons.buyThrust,'thrust'); setBtn(ui.buttons.buyTurn,'turn'); setBtn(ui.buttons.buyMag,'magnet');
+  setBtn(ui.buttons.buyRange,'range'); setBtn(ui.buttons.buyHold,'hold'); setBtn(ui.buttons.buyYield,'yield');
+  setBtn(ui.buttons.buyRof,'rof'); setBtn(ui.buttons.buyBoost,'boost'); setBtn(ui.buttons.buyScan,'scan');
   const setUnlock=(key,btn,price)=>{ if(upgrades[key]){ btn.textContent='Unlocked'; btn.disabled=true; } else { btn.textContent=`Unlock (${price})`; btn.disabled=(ship.credits<price); } };
   setUnlock('lightning', ui.buttons.unlockLightning, 1200);
   setUnlock('mass',      ui.buttons.unlockMass,       900);
   setUnlock('grav',      ui.buttons.unlockGrav,      1500);
 }
 function bindShop(){
-  const B=ui.buttons;
-  const tryBuy = (k,label)=>{
-    if(upgrades[k]>=MAX[k]){ toast(label+' is maxed'); return; }
-    const cost=levelCost(baseCosts[k], upgrades[k]+1);
-    if(ship.credits<cost){ toast('Not enough credits'); return; }
-    ship.credits-=cost; upgrades[k]++; applyUpgrades(); toast(label+' +1');
-    save(); updateUI();
-  };
+  const B=ui.buttons, tryBuy=(k,label)=>{ if(upgrades[k]>=MAX[k]) return toast(label+' is maxed');
+    const cost=levelCost(baseCosts[k], upgrades[k]+1); if(ship.credits<cost) return toast('Not enough credits');
+    ship.credits-=cost; upgrades[k]++; applyUpgrades(); toast(label+' +1'); save(); updateUI(); };
   B.buyLaserD.addEventListener('click',()=>tryBuy('laserD','Laser Damage'));
   B.buyLaserC.addEventListener('click',()=>tryBuy('laserC','Laser Cooling'));
   B.buyRof.addEventListener('click',()=>tryBuy('rof','Laser ROF'));
@@ -436,27 +395,18 @@ function bindShop(){
 const LSKEY='astrominer_save_v1';
 function save(){ localStorage.setItem(LSKEY, JSON.stringify({seed,quality,credits:ship.credits,cargo:ship.cargo,upgrades})); }
 function load(){ try{ const j=localStorage.getItem(LSKEY); if(!j) return; const d=JSON.parse(j);
-  if(d.seed) seed=d.seed; if(d.quality) quality=d.quality;
-  if(d.credits!=null) ship.credits=d.credits; if(d.cargo!=null) ship.cargo=d.cargo;
-  if(d.upgrades) Object.assign(upgrades,d.upgrades);
+  if(d.seed) seed=d.seed; if(d.quality) quality=d.quality; if(d.credits!=null) ship.credits=d.credits; if(d.cargo!=null) ship.cargo=d.cargo; if(d.upgrades) Object.assign(upgrades,d.upgrades);
   applyUpgrades();
 }catch(e){ console.warn('save load failed',e); } }
 
-/* ---------- Stars / Skydome ---------- */
-function finalizeGlowTexture(t){
-  t.anisotropy = 2; t.generateMipmaps = false;
-  t.minFilter = THREE.LinearFilter; t.magFilter = THREE.LinearFilter;
-  t.wrapS = THREE.ClampToEdgeWrapping; t.wrapT = THREE.ClampToEdgeWrapping;
-  t.premultiplyAlpha = true; t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; return t;
-}
+/* ---------- Sky & stars ---------- */
+function finalizeGlowTexture(t){ t.anisotropy=2; t.generateMipmaps=false; t.minFilter=THREE.LinearFilter; t.magFilter=THREE.LinearFilter; t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping; t.premultiplyAlpha=true; t.colorSpace=THREE.SRGBColorSpace; t.needsUpdate=true; return t; }
 function makeGlowTexture(size=96, inner=0.0, outer=1.0, col='rgba(255,240,140,1)'){
-  const c=document.createElement('canvas'); c.width=c.height=size;
-  const x=c.getContext('2d'); x.clearRect(0,0,size,size);
-  const g=x.createRadialGradient(size/2,size/2,size*inner,size/2,size/2,size*outer);
-  g.addColorStop(0,col); g.addColorStop(1,'rgba(0,0,0,0)'); x.fillStyle=g; x.fillRect(0,0,size,size);
+  const c=document.createElement('canvas'); c.width=c.height=size; const x=c.getContext('2d'); x.clearRect(0,0,size,size);
+  const g=x.createRadialGradient(size/2,size/2,size*inner,size/2,size/2,size*outer); g.addColorStop(0,col); g.addColorStop(1,'rgba(0,0,0,0)'); x.fillStyle=g; x.fillRect(0,0,size,size);
   return finalizeGlowTexture(new THREE.CanvasTexture(c));
 }
-async function makeStarfieldAsync(seed, count, spread=90000, progress){
+async function makeStarfieldAsync(seed, count, spread=70000, progress){
   const group=new THREE.Group(); const R=rng(seed);
   async function layer(n, spr, size, label){
     const geo=new THREE.BufferGeometry(); const pos=new Float32Array(n*3);
@@ -465,7 +415,7 @@ async function makeStarfieldAsync(seed, count, spread=90000, progress){
       pos[i*3]=r*s*Math.cos(th); pos[i*3+1]=r*Math.cos(ph); pos[i*3+2]=r*s*Math.sin(th);
       if((i&1023)===0){ progress && progress(`${label} ${Math.floor(i/n*100)}%`); await nextFrame(); }
     }
-    const mat=new THREE.PointsMaterial({size, color:0xffffff, sizeAttenuation:true, transparent:false, depthWrite:false});
+    const mat=new THREE.PointsMaterial({size, color:0xffffff, sizeAttenuation:true, depthWrite:false});
     const pts=new THREE.Points(geo.setAttribute('position',new THREE.BufferAttribute(pos,3)),mat);
     pts.frustumCulled=false; group.add(pts);
   }
@@ -481,21 +431,14 @@ function makeSkydome(seed){
   const c1=new THREE.Vector3(R()*2-1,R()*2-1,R()*2-1).normalize();
   const c2=new THREE.Vector3(R()*2-1,R()*2-1,R()*2-1).normalize();
   const mat=new THREE.ShaderMaterial({
-    side:THREE.BackSide, depthTest:false, depthWrite:false, transparent:false,
-    uniforms:{
-      uC0:{value:c0}, uC1:{value:c1}, uC2:{value:c2},
-      uCol0:{value:new THREE.Color(0.40,0.30,0.70)},
-      uCol1:{value:new THREE.Color(0.70,0.40,0.20)},
-      uCol2:{value:new THREE.Color(0.20,0.50,0.80)},
-      uBase:{value:new THREE.Color(0.004,0.006,0.010)}
-    },
+    side:THREE.BackSide, depthTest:false, depthWrite:false,
+    uniforms:{uC0:{value:c0},uC1:{value:c1},uC2:{value:c2},uCol0:{value:new THREE.Color(0.40,0.30,0.70)},uCol1:{value:new THREE.Color(0.70,0.40,0.20)},uCol2:{value:new THREE.Color(0.20,0.50,0.80)},uBase:{value:new THREE.Color(0.004,0.006,0.010)}},
     vertexShader:`varying vec3 vDir;void main(){vec4 wp=modelMatrix*vec4(position,1.0);vDir=normalize(wp.xyz-cameraPosition);gl_Position=projectionMatrix*viewMatrix*wp;}`,
     fragmentShader:`precision mediump float;varying vec3 vDir;uniform vec3 uC0,uC1,uC2,uCol0,uCol1,uCol2,uBase;
       float lobe(vec3 d,vec3 c,float s){float m=max(0.,dot(normalize(d),normalize(c)));return pow(m,s);}
-      void main(){vec3 d=normalize(vDir);float a=lobe(d,uC0,2.0),b=lobe(d,uC1,2.0),c=lobe(d,uC2,2.0);
-      vec3 col=uBase+0.5*(a*uCol0+b*uCol1+c*uCol2);gl_FragColor=vec4(col,1.0);} `
+      void main(){vec3 d=normalize(vDir);float a=lobe(d,uC0,2.0),b=lobe(d,uC1,2.0),c=lobe(d,uC2,2.0);vec3 col=uBase+0.5*(a*uCol0+b*uCol1+c*uCol2);gl_FragColor=vec4(col,1.0);} `
   });
-  const g=new THREE.SphereGeometry(240000, 32, 16);
+  const g=new THREE.SphereGeometry(220000,32,16);
   const dome=new THREE.Mesh(g,mat); dome.renderOrder=-100; dome.frustumCulled=false; return dome;
 }
 
@@ -503,9 +446,26 @@ function makeSkydome(seed){
 let quality='high', seed=(Math.random()*1e9)|0;
 const AST={ inst:[], data:[], count:0 };
 const DROPS={ inst:null, data:[], count:0, cap:0, geo:null, mat:null };
-const MISSILES=[];   // projectiles
-const LASER_BEAMS=[];// beam visuals
+const MISSILES=[], LASER_BEAMS=[];
 
+/* Field positions & dust */
+let FIELDS=[]; // {center:Vector3}
+const FIELD_FX={ group:new THREE.Group(), dust:[] }; scene.add(FIELD_FX.group);
+function clearFieldFX(){ for(const s of FIELD_FX.dust){ FIELD_FX.group.remove(s); s.material.map.dispose(); s.material.dispose(); } FIELD_FX.dust.length=0; }
+function buildFieldFX(){
+  clearFieldFX();
+  const dustTex = makeGlowTexture(512, 0.0, 1.0, 'rgba(110,160,220,0.35)');
+  for(const f of FIELDS){
+    for(let i=0;i<2;i++){
+      const s=new THREE.Sprite(new THREE.SpriteMaterial({map:dustTex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.18}));
+      s.position.copy(f.center.clone().add(new THREE.Vector3((Math.random()-0.5)*400,(Math.random()-0.5)*150,(Math.random()-0.5)*400)));
+      s.scale.set(1400+Math.random()*600, 1400+Math.random()*600, 1);
+      FIELD_FX.group.add(s); FIELD_FX.dust.push(s);
+    }
+  }
+}
+
+/* Rsc kinds for future economy (kept) */
 const RES_KINDS=[{name:'Iron',val:8,color:0xa0a8b8},{name:'Nickel',val:10,color:0x9fb7aa},{name:'Silver',val:14,color:0xc0c0ff},{name:'Gold',val:22,color:0xffd54a},{name:'Platinum',val:30,color:0xd9d9ff},{name:'Iridium',val:40,color:0xa3d1ff}];
 
 /* ---------- Rock / Crystal / Metal geometry ---------- */
@@ -527,80 +487,57 @@ function geoMetal(seed,scale=1){ const g=new THREE.IcosahedronGeometry(scale,1),
 }
 
 /* ---------- Materials ---------- */
-function makeMatRock(){
-  const m=new THREE.MeshStandardMaterial({color:0x8a929c, roughness:0.97, metalness:0.03, vertexColors:true, flatShading:true});
-  m.onBeforeCompile=(s)=>{ s.fragmentShader = s.fragmentShader.replace('#include <emissivemap_fragment>',
-    `#include <emissivemap_fragment>
-     float fres = pow(1.0 - saturate(dot(normalize(normal), normalize(vViewPosition))), 3.0);
-     #ifdef USE_COLOR
-       totalEmissiveRadiance += vec3(0.10) * fres * (0.6 + 0.4*length(vColor));
-     #else
-       totalEmissiveRadiance += vec3(0.10) * fres;
-     #endif` ); };
-  return m;
-}
-function makeMatCrystal(){
-  const m=new THREE.MeshStandardMaterial({color:0x8bd7ff, roughness:0.18, metalness:0.0, emissive:new THREE.Color(0x206080), emissiveIntensity:0.25, vertexColors:true, flatShading:true});
-  m.onBeforeCompile=(s)=>{ s.fragmentShader = s.fragmentShader.replace('#include <emissivemap_fragment>',
-    `#include <emissivemap_fragment>
-     float fres = pow(1.0 - saturate(dot(normalize(normal), normalize(vViewPosition))), 2.5);
-     totalEmissiveRadiance += vec3(0.20,0.55,0.65) * fres;` ); };
-  return m;
-}
-function makeMatMetal(){
-  // darker, rougher → less icy
-  const m=new THREE.MeshStandardMaterial({color:0x6f7885, roughness:0.60, metalness:0.95, vertexColors:true, flatShading:true});
-  return m;
-}
+function makeMatRock(){ const m=new THREE.MeshStandardMaterial({color:0x8a929c, roughness:0.97, metalness:0.03, vertexColors:true, flatShading:true});
+  m.onBeforeCompile=(s)=>{ s.fragmentShader = s.fragmentShader.replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
+    float fres = pow(1.0 - saturate(dot(normalize(normal), normalize(vViewPosition))), 3.0);
+    #ifdef USE_COLOR
+      totalEmissiveRadiance += vec3(0.10) * fres * (0.6 + 0.4*length(vColor));
+    #else
+      totalEmissiveRadiance += vec3(0.10) * fres;
+    #endif` ); }; return m; }
+function makeMatCrystal(){ const m=new THREE.MeshStandardMaterial({color:0x8bd7ff, roughness:0.18, metalness:0.0, emissive:new THREE.Color(0x206080), emissiveIntensity:0.25, vertexColors:true, flatShading:true});
+  m.onBeforeCompile=(s)=>{ s.fragmentShader = s.fragmentShader.replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
+    float fres = pow(1.0 - saturate(dot(normalize(normal), normalize(vViewPosition))), 2.5);
+    totalEmissiveRadiance += vec3(0.20,0.55,0.65) * fres;` ); }; return m; }
+function makeMatMetal(){ return new THREE.MeshStandardMaterial({color:0x6f7885, roughness:0.60, metalness:0.95, vertexColors:true, flatShading:true}); }
 
 /* ---------- Build Multi‑Field Asteroids (async) ---------- */
 async function buildAsteroidsAsync(seed, progress){
   // Cleanup
   AST.inst.forEach(im=>{ scene.remove(im); im.geometry.dispose(); im.material.dispose(); });
-  AST.inst=[]; AST.data=[]; AST.count=0;
+  AST.inst=[]; AST.data=[]; AST.count=0; FIELDS=[];
 
   const R=rng(seed^0xBEEF);
   const fields = (quality==='ultra')?6:4;
-  const basePerField = (quality==='ultra')?900:700;
+  const basePerField = (quality==='ultra')?850:650;
   const baseCount = basePerField * fields;
 
-  // composition: metals rare
-  const frac = { rock:0.70, crystal:0.24, metal:0.04, giants:0.02 };
-  const counts={
-    rock: Math.floor(baseCount*frac.rock),
-    crystal: Math.floor(baseCount*frac.crystal),
-    metal: Math.floor(baseCount*frac.metal),
-    giants: Math.floor(baseCount*frac.giants)
-  };
+  const frac = { rock:0.72, crystal:0.23, metal:0.04, giants:0.01 }; // metals rare
+  const counts={ rock:Math.floor(baseCount*frac.rock), crystal:Math.floor(baseCount*frac.crystal), metal:Math.floor(baseCount*frac.metal), giants:Math.floor(baseCount*frac.giants) };
   const extraCluster = Math.floor(baseCount*0.08);
 
-  // Field centers placed on a big ring
-  const ringR = (quality==='ultra')?16000:13000;
-  const centers=[];
-  const jitter=()=>new THREE.Vector3((R()*2-1)*800,(R()*2-1)*500,(R()*2-1)*800);
-  for(let i=0;i<fields;i++){
-    const a = (i/fields)*Math.PI*2 + R()*0.25;
-    centers.push(new THREE.Vector3(Math.cos(a)*ringR,(R()*2-1)*600,Math.sin(a)*ringR).add(jitter()));
+  // Field centers: one at origin (start field), rest on smaller ring (~halved)
+  const ringR = (quality==='ultra')?8000:6500; // was ~16000/13000
+  FIELDS.push({center:new THREE.Vector3(0,0,0)});
+  for(let i=1;i<fields;i++){
+    const a = (i/(fields-1))*Math.PI*2 + R()*0.25;
+    const c=new THREE.Vector3(Math.cos(a)*ringR,(R()*2-1)*420,Math.sin(a)*ringR);
+    c.add(new THREE.Vector3((R()*2-1)*500,(R()*2-1)*280,(R()*2-1)*500));
+    FIELDS.push({center:c});
   }
 
-  // geometry/material pools
   const geosRock=[geoRock(seed^0x1111,1.0), geoRock(seed^0x2222,1.25), geoRock(seed^0x3333,0.85)];
   const geosCrystal=[geoCrystal(seed^0x4444,1.0), geoCrystal(seed^0x5555,0.9)];
   const geosMetal=[geoMetal(seed^0x6666,1.1), geoMetal(seed^0x7777,1.2)];
   const matRock=makeMatRock(), matCrystal=makeMatCrystal(), matMetal=makeMatMetal();
 
-  function allocInst(geo,mat,n){
-    const inst=new THREE.InstancedMesh(geo,mat,n);
+  function allocInst(geo,mat,n){ const inst=new THREE.InstancedMesh(geo,mat,n);
     inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     inst.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(n*3),3);
     inst.frustumCulled=false; scene.add(inst);
-    const gi=AST.inst.push(inst)-1; return {inst,gi,count:n,idx:0};
-  }
+    const gi=AST.inst.push(inst)-1; return {inst,gi,count:n,idx:0}; }
   const pools=[];
-  function addPools(geos,mat,nTotal){
-    const split = geos.map((_g,i)=>Math.floor(nTotal/geos.length)+(i===0?nTotal%geos.length:0));
-    for(let i=0;i<geos.length;i++) pools.push(allocInst(geos[i],mat,split[i]));
-  }
+  function addPools(geos,mat,nTotal){ const split = geos.map((_g,i)=>Math.floor(nTotal/geos.length)+(i===0?nTotal%geos.length:0)); for(let i=0;i<geos.length;i++) pools.push(allocInst(geos[i],mat,split[i])); }
   addPools(geosRock,   matRock,   counts.rock + extraCluster);
   addPools(geosCrystal,matCrystal,counts.crystal);
   addPools(geosMetal,  matMetal,  counts.metal);
@@ -608,29 +545,23 @@ async function buildAsteroidsAsync(seed, progress){
 
   const makeColRock   =()=>new THREE.Color().setHSL(0.60+R()*0.06, 0.12+R()*0.10, 0.58+R()*0.10);
   const makeColCrystal=()=>new THREE.Color().setHSL(0.55+R()*0.20, 0.45+R()*0.25, 0.65+R()*0.20);
-  const makeColMetal  =()=>{ const steel=new THREE.Color().setHSL(0.60+R()*0.04,0.12+R()*0.10,0.42+R()*0.08);
-                             const copper=new THREE.Color().setHSL(0.06+R()*0.05,0.35+R()*0.15,0.50+R()*0.10);
-                             return (R()<0.75)?steel:copper; };
+  const makeColMetal  =()=>{ const steel=new THREE.Color().setHSL(0.60+R()*0.04,0.12+R()*0.10,0.42+R()*0.08); const copper=new THREE.Color().setHSL(0.06+R()*0.05,0.35+R()*0.15,0.50+R()*0.10); return (R()<0.75)?steel:copper; };
 
-  const beltR=2500,beltW=1200,beltH=800;
-  function posInField(fieldIndex, clustered=false){
-    const center=centers[fieldIndex];
+  const beltR=2200,beltW=1000,beltH=700;
+  function posInField(fIdx, clustered=false){
+    const center=FIELDS[fIdx].center;
     if(clustered){
-      const rad=160+R()*260;
-      const dir=new THREE.Vector3(R()*2-1,R()*2-1,R()*2-1).normalize();
-      const d=rad*Math.pow(R(),0.7);
+      const rad=160+R()*260; const dir=new THREE.Vector3(R()*2-1,R()*2-1,R()*2-1).normalize(); const d=rad*Math.pow(R(),0.7);
       return center.clone().addScaledVector(dir,d);
     }else{
       const a=R()*Math.PI*2, r=beltR+(R()*2-1)*beltW, x=Math.cos(a)*r, z=Math.sin(a)*r, y=(R()*2-1)*beltH;
       return center.clone().add(new THREE.Vector3(x,y,z));
     }
   }
-
   function choosePoolByMat(mat){ for(const p of pools){ if(p.inst.material===mat && p.idx<p.count) return p; } return null; }
   function spawnTo(pool, P, size, hp, color, type){
     if(!pool) return; if(pool.idx>=pool.count) return;
-    const Rloc=rng((P.x^P.y^P.z)>>>0);
-    const q=new THREE.Quaternion().setFromEuler(new THREE.Euler(Rloc()*Math.PI,Rloc()*Math.PI,Rloc()*Math.PI));
+    const q=new THREE.Quaternion().setFromEuler(new THREE.Euler(R()*Math.PI,R()*Math.PI,R()*Math.PI));
     const m=new THREE.Matrix4().compose(P, q, new THREE.Vector3(size,size,size));
     pool.inst.setMatrixAt(pool.idx,m); pool.inst.setColorAt(pool.idx,color);
     AST.data.push({x:P.x,y:P.y,z:P.z,size,hp,alive:true,gi:pool.gi,idx:pool.idx,type});
@@ -638,53 +569,29 @@ async function buildAsteroidsAsync(seed, progress){
   }
   function finalizePools(){ for(const p of pools){ p.inst.count=p.idx; p.inst.instanceMatrix.needsUpdate=true; p.inst.instanceColor.needsUpdate=true; } }
 
-  // distribute counts across fields
-  const share = (total)=> Math.floor(total/fields);
-  const rem   = (total)=> total - share(total)*fields;
-
-  const rockPer     = share(counts.rock);
-  const crystalPer  = share(counts.crystal);
-  const metalPer    = share(counts.metal);
-  const clusterPer  = Math.floor(share(extraCluster));
-  const giantsPer   = Math.max(0, Math.floor(counts.giants/fields));
-  let rockRemain=rem(counts.rock), crystalRemain=rem(counts.crystal), metalRemain=rem(counts.metal);
+  // distribute per field
+  const share=(n)=>Math.floor(n/fields), rem=(n)=>n-share(n)*fields;
+  let rRem=rem(counts.rock), cRem=rem(counts.crystal), mRem=rem(counts.metal);
+  const rockPer=share(counts.rock), crystalPer=share(counts.crystal), metalPer=share(counts.metal);
+  const clustersPer=Math.floor(share(extraCluster)); const giantsPer=Math.max(0,Math.floor(counts.giants/fields));
 
   for(let f=0; f<fields; f++){
-    const rocks    = rockPer    + (rockRemain-->0?1:0);
-    const crystals = crystalPer + (crystalRemain-->0?1:0);
-    const metals   = metalPer   + (metalRemain-->0?1:0);
-    const clusters = clusterPer;
-    // clusters seed (sprinkled among rocks)
-    for(let i=0;i<clusters;i++){
-      const P=posInField(f,true);
-      const size=6+Math.pow(R(),2)*40; const hp=Math.round(size*1.2+30);
-      spawnTo(choosePoolByMat(matRock), P,size,hp,makeColRock(),'rock');
-      if((i&255)===0){ progress && progress(`Clusters…`); await nextFrame(); }
-    }
-    for(let i=0;i<rocks;i++){
-      const P=posInField(f,false);
-      const size=6+Math.pow(R(),2)*40; const hp=Math.round(size*1.2+30);
-      spawnTo(choosePoolByMat(matRock), P,size,hp,makeColRock(),'rock');
-      if((i&511)===0){ progress && progress(`Rocks…`); await nextFrame(); }
-    }
-    for(let i=0;i<crystals;i++){
-      const P=(R()<0.35)?posInField(f,true):posInField(f,false);
-      const size=5+Math.pow(R(),1.8)*28; const hp=Math.round(size*1.0+24);
-      spawnTo(choosePoolByMat(matCrystal), P,size,hp,makeColCrystal(),'crystal');
-      if((i&511)===0){ progress && progress(`Crystals…`); await nextFrame(); }
-    }
-    for(let i=0;i<metals;i++){
-      const P=(R()<0.25)?posInField(f,true):posInField(f,false);
-      const size=8+Math.pow(R(),2.2)*36; const hp=Math.round(size*1.35+40);
-      spawnTo(choosePoolByMat(matMetal), P,size,hp,makeColMetal(),'metal');
-      if((i&511)===0){ progress && progress(`Metals…`); await nextFrame(); }
-    }
-    for(let i=0;i<giantsPer;i++){
-      const P=posInField(f,false); const size=70+R()*80; const hp=Math.round(size*2.0+180);
-      spawnTo(giantsPool,P,size,hp,makeColRock(),'rock');
-    }
+    const rocks=rockPer+(rRem-->0?1:0);
+    const crystals=crystalPer+(cRem-->0?1:0);
+    const metals=metalPer+(mRem-->0?1:0);
+    for(let i=0;i<clustersPer;i++){ const P=posInField(f,true); const size=6+Math.pow(R(),2)*40; const hp=Math.round(size*1.2+30);
+      spawnTo(choosePoolByMat(matRock),P,size,hp,makeColRock(),'rock'); if((i&255)===0){ progress&&progress('Clusters…'); await nextFrame(); } }
+    for(let i=0;i<rocks;i++){ const P=posInField(f,false); const size=6+Math.pow(R(),2)*40; const hp=Math.round(size*1.2+30);
+      spawnTo(choosePoolByMat(matRock),P,size,hp,makeColRock(),'rock'); if((i&511)===0){ progress&&progress('Rocks…'); await nextFrame(); } }
+    for(let i=0;i<crystals;i++){ const P=(R()<0.35)?posInField(f,true):posInField(f,false); const size=5+Math.pow(R(),1.8)*28; const hp=Math.round(size*1.0+24);
+      spawnTo(choosePoolByMat(matCrystal),P,size,hp,makeColCrystal(),'crystal'); if((i&511)===0){ progress&&progress('Crystals…'); await nextFrame(); } }
+    for(let i=0;i<metals;i++){ const P=(R()<0.25)?posInField(f,true):posInField(f,false); const size=8+Math.pow(R(),2.2)*36; const hp=Math.round(size*1.35+40);
+      spawnTo(choosePoolByMat(matMetal),P,size,hp,makeColMetal(),'metal'); if((i&511)===0){ progress&&progress('Metals…'); await nextFrame(); } }
+    for(let i=0;i<giantsPer;i++){ const P=posInField(f,false); const size=60+R()*70; const hp=Math.round(size*1.9+160);
+      spawnTo(choosePoolByMat(matRock),P,size,hp,makeColRock(),'rock'); }
   }
   finalizePools();
+  buildFieldFX();
 }
 
 /* ---------- Drops ---------- */
@@ -730,18 +637,15 @@ function destroyAsteroid(rec){
 /* ---------- FX & Weapons ---------- */
 const FX={ group:new THREE.Group() }; scene.add(FX.group);
 function makeBeamGlow(size=96,inner=0,outer=1,col='rgba(130,200,255,1)'){
-  const c=document.createElement('canvas'); c.width=c.height=size;
-  const x=c.getContext('2d'); x.clearRect(0,0,size,size);
-  const g=x.createRadialGradient(size/2,size/2,size*inner,size/2,size/2,size*outer);
-  g.addColorStop(0,col); g.addColorStop(1,'rgba(0,0,0,0)'); x.fillStyle=g; x.fillRect(0,0,size,size);
+  const c=document.createElement('canvas'); c.width=c.height=size; const x=c.getContext('2d'); x.clearRect(0,0,size,size);
+  const g=x.createRadialGradient(size/2,size/2,size*inner,size/2,size/2,size*outer); g.addColorStop(0,col); g.addColorStop(1,'rgba(0,0,0,0)'); x.fillStyle=g; x.fillRect(0,0,size,size);
   return finalizeGlowTexture(new THREE.CanvasTexture(c));
 }
 const glowTexBlue = makeBeamGlow(128,0,0.5,'rgba(130,200,255,1)');
 const glowTexOrange = makeBeamGlow(128,0,0.5,'rgba(255,180,80,1)');
 
 function spawnExplosion(pos,scale){
-  const g=new THREE.SphereGeometry(1,10,8),
-  m=new THREE.MeshBasicMaterial({color:0xffaa55,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false});
+  const g=new THREE.SphereGeometry(1,10,8), m=new THREE.MeshBasicMaterial({color:0xffaa55,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false});
   const s=new THREE.Mesh(g,m); s.position.copy(pos); s.scale.setScalar(0.5); s.userData.t=0; s.userData.life=0.4; s.userData.scale=scale*0.08+0.6; FX.group.add(s);
   const dist=pos.distanceTo(ship.pos); const pct=THREE.MathUtils.clamp(1-dist/1000,0,1);
   if(pct>0){ addShake(0.6*pct, 0.25+0.2*pct); AUD.boom(); screenFlash(0.12*pct); triggerKick(1.2*pct); }
@@ -772,12 +676,10 @@ function removeBeam(b){
   scene.remove(b.mesh,b.outer,b.startGlow,b.endGlow);
   b.mesh.geometry.dispose(); b.mesh.material.dispose();
   b.outer.geometry.dispose(); b.outer.material.dispose();
-  b.startGlow.material.dispose();
-  b.endGlow.material.dispose();
+  b.startGlow.material.dispose(); b.endGlow.material.dispose();
 }
 function triggerKick(k){ fovKick=Math.min(4, fovKick + k); }
 function screenFlash(a){ flashAmt=Math.min(1, flashAmt+a); }
-
 function fireLaser(){
   const L=ship.laser; if(L.over||L._cd>0) return; L.heat+=L.shotHeat; if(L.heat>=100){ L.over=true; toast('Laser overheated!'); }
   L._cd=1/Math.max(3,ship.laser.rof);
@@ -800,7 +702,7 @@ function spawnMissile(dir){
   MISSILES.push({pos:nose.clone(),vel:dir.clone().multiplyScalar(180),life:10,mesh:group,trailT:0});
 }
 
-/* ---------- Aiming / Ray ---------- */
+/* ---------- Ray / Aim ---------- */
 function getReticleRay(){ const origin=camera.position.clone(); const dir=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).normalize(); return {origin,dir}; }
 function rayHitAsteroids(origin,dir,maxRange){
   let bestT=Infinity,best=null;
@@ -813,32 +715,20 @@ function rayHitAsteroids(origin,dir,maxRange){
   return {hit:false,t:maxRange,rock:null,point:origin.clone().addScaledVector(dir,maxRange)};
 }
 
-/* ---------- Station ---------- */
-const STATION={ group:null, pos:new THREE.Vector3(0,0,-22000), arm:null };
+/* ---------- Station (half distance) ---------- */
+const STATION={ group:null, pos:new THREE.Vector3(0,0,-11000), arm:null }; // was -22000
 function buildStation(){
   if(STATION.group){ scene.remove(STATION.group); }
   const g=new THREE.Group();
-
-  const core=new THREE.Mesh(new THREE.CylinderGeometry(30,30,160,24,1,true),
-    new THREE.MeshStandardMaterial({color:0x26313f,metalness:0.8,roughness:0.4}));
-  g.add(core);
-
-  const ring=new THREE.Mesh(new THREE.TorusGeometry(140,10,18,72),
-    new THREE.MeshStandardMaterial({color:0x3a4d62,metalness:0.7,roughness:0.45}));
-  ring.rotation.x=Math.PI/2; g.add(ring);
-
-  const arm=new THREE.Group();
-  for(let i=0;i<4;i++){
-    const p=new THREE.Mesh(new THREE.BoxGeometry(8,180,2),
-      new THREE.MeshStandardMaterial({color:0x88aadd,metalness:0.2,roughness:0.8,emissive:0x0a1422,emissiveIntensity:0.25}));
-    p.position.y=100; p.rotation.z=Math.PI/2; const h=new THREE.Group(); h.rotation.y=i*Math.PI/2; h.add(p); arm.add(h);
-  }
-  arm.position.y=40; g.add(arm); STATION.arm=arm;
-
+  const core=new THREE.Mesh(new THREE.CylinderGeometry(30,30,160,24,1,true), new THREE.MeshStandardMaterial({color:0x26313f,metalness:0.8,roughness:0.4}));
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(140,10,18,72), new THREE.MeshStandardMaterial({color:0x3a4d62,metalness:0.7,roughness:0.45}));
+  ring.rotation.x=Math.PI/2; const arm=new THREE.Group();
+  for(let i=0;i<4;i++){ const p=new THREE.Mesh(new THREE.BoxGeometry(8,180,2), new THREE.MeshStandardMaterial({color:0x88aadd,metalness:0.2,roughness:0.8,emissive:0x0a1422,emissiveIntensity:0.25}));
+    p.position.y=100; p.rotation.z=Math.PI/2; const h=new THREE.Group(); h.rotation.y=i*Math.PI/2; h.add(p); arm.add(h); }
   const beacon=new THREE.Sprite(new THREE.SpriteMaterial({map:makeGlowTexture(256,0.0,0.85,'rgba(120,255,200,1)'),transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.7}));
-  beacon.scale.set(160,160,1); g.add(beacon);
-
-  g.position.copy(STATION.pos); g.frustumCulled=false; scene.add(g); STATION.group=g;
+  beacon.scale.set(160,160,1);
+  g.add(core, ring, arm, beacon); g.position.copy(STATION.pos); g.frustumCulled=false; scene.add(g);
+  STATION.group=g; STATION.arm=arm;
 }
 let dockPrompt=false, docked=false;
 function refineAtStation(){
@@ -852,21 +742,15 @@ function openDockPanel(){
   ui.dsCargo.textContent = `${ship.cargo|0}/${ship.cargoCap|0}`;
   ui.dsSpeed.textContent = ship.vel.length().toFixed(1);
   ui.dockMask.style.display='flex';
-  // mount shop inside docking modal
   ui.dockShopMount.appendChild(ui.shop);
   ui.shop.style.display='block';
 }
 function closeDockPanel(){
-  ui.dockMask.style.display='none';
-  docked=false;
-  // keep shop detachable
-  document.body.appendChild(ui.shop);
-  ui.shop.style.display='none';
+  ui.dockMask.style.display='none'; docked=false; document.body.appendChild(ui.shop); ui.shop.style.display='none';
   if(pauseReason==='dock'){ setPaused(false,null); if(fpsOn) ui.fps.style.display='block'; }
 }
 byId('dockRefine').addEventListener('click',()=>refineAtStation());
 byId('dockUndock').addEventListener('click',()=>closeDockPanel());
-
 function updateStation(dt){
   if(!STATION.group) return;
   STATION.arm.rotation.y += dt*0.25;
@@ -878,12 +762,10 @@ function updateStation(dt){
       if(keys['KeyC']) openDockPanel();
     } else dockPrompt=false;
   }
-  updateNavHUD(STATION.pos);
 }
 
-/* ---------- Scan pips ---------- */
-const SCAN={ group:new THREE.Group(), sprites:[], last:0 };
-scene.add(SCAN.group);
+/* ---------- Scanner pips ---------- */
+const SCAN={ group:new THREE.Group(), sprites:[], last:0 }; scene.add(SCAN.group);
 function makePip(color){
   const s=new THREE.Sprite(new THREE.SpriteMaterial({map:makeGlowTexture(96,0.3,1.0,`rgba(${color},1)`),transparent:true,blending:THREE.AdditiveBlending,depthTest:false,depthWrite:false,opacity:0.8}));
   s.scale.set(10,10,1); s.visible=false; SCAN.group.add(s); return s;
@@ -893,20 +775,11 @@ function updateScan(dt){
   SCAN.last+=dt; if(SCAN.last<0.75) return; SCAN.last=0;
   const maxPips=40; ensurePips(maxPips);
   const center=ship.pos; const cand=[];
-  for(const a of AST.data){
-    if(!a.alive) continue; if(a.type==='rock') continue;
-    const dx=a.x-center.x, dy=a.y-center.y, dz=a.z-center.z;
-    const d2=dx*dx+dy*dy+dz*dz; if(d2>ship.scannerRange*ship.scannerRange) continue;
-    cand.push([d2,a]);
-  }
-  cand.sort((A,B)=>A[0]-B[0]);
-  for(let i=0;i<SCAN.sprites.length;i++) SCAN.sprites[i].visible=false;
+  for(const a of AST.data){ if(!a.alive||a.type==='rock') continue;
+    const dx=a.x-center.x, dy=a.y-center.y, dz=a.z-center.z; const d2=dx*dx+dy*dy+dz*dz; if(d2>ship.scannerRange*ship.scannerRange) continue; cand.push([d2,a]); }
+  cand.sort((A,B)=>A[0]-B[0]); for(let i=0;i<SCAN.sprites.length;i++) SCAN.sprites[i].visible=false;
   const used=Math.min(maxPips, cand.length);
-  for(let i=0;i<used;i++){
-    const a=cand[i][1], sp=SCAN.sprites[i];
-    sp.visible=true; sp.position.set(a.x,a.y,a.z);
-    sp.scale.setScalar(6 + Math.min(24, a.size*0.3));
-  }
+  for(let i=0;i<used;i++){ const a=cand[i][1], sp=SCAN.sprites[i]; sp.visible=true; sp.position.set(a.x,a.y,a.z); sp.scale.setScalar(6+Math.min(24,a.size*0.3)); }
 }
 
 /* ---------- UI ---------- */
@@ -918,14 +791,13 @@ function updateUI(){
   ui.cap.textContent=ship.cargoCap|0;
   ui.barLaser.style.width=clamp(ship.laser.heat,0,100)+'%';
   ui.barMiss.style.width =clamp(ship.missile.heat,0,100)+'%';
-  const boostPct=clamp((ship.boost.val/ship.boost.cap)*100,0,100);
-  ui.barBoost.style.width = boostPct+'%';
+  ui.barBoost.style.width = clamp((ship.boost.val/ship.boost.cap)*100,0,100)+'%';
   ui.barLaser.classList.toggle('warn', ship.laser.heat>85);
   ui.barMiss.classList.toggle('warn', ship.missile.heat>85);
   refreshShop();
 }
 
-/* ---------- Target indicator (ring + fill) ---------- */
+/* ---------- Target indicator ---------- */
 const TARGET={ group:null, rock:null };
 function ensureTargetVisual(){
   if(TARGET.group) return;
@@ -935,8 +807,7 @@ function ensureTargetVisual(){
   const fillGeo=new THREE.CircleGeometry(0.92, 48);
   const fillMat=new THREE.MeshBasicMaterial({color:0x68ffb0, transparent:true, opacity:0.12, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide});
   const fill=new THREE.Mesh(fillGeo, fillMat);
-  const g=new THREE.Group(); g.add(fill,ring); g.visible=false; g.renderOrder=2;
-  scene.add(g); TARGET.group=g;
+  const g=new THREE.Group(); g.add(fill,ring); g.visible=false; g.renderOrder=2; scene.add(g); TARGET.group=g;
 }
 function showTarget(rock){
   ensureTargetVisual();
@@ -950,32 +821,45 @@ function showTarget(rock){
   ui.tgtHud.textContent = `${rock.type||'asteroid'} · ${Math.max(0,rock.hp|0)} HP · ${camera.position.distanceTo(pos).toFixed(0)} m`;
 }
 
-/* ---------- Nav HUD (edge clamp + behind fix) ---------- */
-function updateNavHUD(worldPos){
+/* ---------- Nav (stable edge clamp + smoothing + cycle) ---------- */
+const NAV={ px:innerWidth/2, py:40, targetIdx:0,
+  currentPos(){ if(this.targetIdx===0) return STATION.pos; const f=FIELDS[this.targetIdx-1]; return f?f.center:STATION.pos; },
+  currentName(){ return this.targetIdx===0?'STATION':('FIELD '+String.fromCharCode(65+this.targetIdx-1)); },
+  nextTarget(){ const max=1+FIELDS.length; this.targetIdx=(this.targetIdx+1)%max; toast('Nav → '+this.currentName()); },
+};
+function updateNavHUD(worldPos,dt){
   const w=innerWidth, h=innerHeight, pad=22;
-  const camDir=new THREE.Vector3(); camera.getWorldDirection(camDir);
-  const to=worldPos.clone().sub(camera.position);
-  const inFront = to.dot(camDir) > 0;
+  const padNdcX = pad/(w*0.5), padNdcY = pad/(h*0.5);
 
-  // Project to NDC
-  const v=worldPos.clone().project(camera);
-  let x=(v.x*0.5+0.5)*w, y=(-v.y*0.5+0.5)*h;
+  // Project to NDC and detect behind via camera space Z
+  const cp = worldPos.clone().applyMatrix4(camera.matrixWorldInverse);
+  const behind = cp.z > 0; // in camera space, z<0 is in front
+  let v = worldPos.clone().project(camera); // NDC
+  if(behind){ v.x = -v.x; v.y = -v.y; } // flip when behind
 
-  // If behind camera, flip toward the nearest screen edge
-  if(!inFront){ x = w - x; y = h - y; }
+  // Normalize into screen box (kill jitter by keeping on border)
+  const m = Math.max(Math.abs(v.x), Math.abs(v.y), 1e-6);
+  v.x /= m; v.y /= m;
+  v.x = clamp(v.x, -1+padNdcX, 1-padNdcX);
+  v.y = clamp(v.y, -1+padNdcY, 1-padNdcY);
 
-  // Clamp to edges with padding
-  x=clamp(x, pad, w-pad); y=clamp(y, pad, h-pad);
+  const targetX = (v.x*0.5+0.5)*w;
+  const targetY = (-v.y*0.5+0.5)*h;
 
-  // Hide nav if docked or very close
+  // Smooth follow to suppress jitter
+  const alpha = 1 - Math.pow(0.001, dt*60*0.9); // ~0.1..0.2 per frame
+  NAV.px = lerp(NAV.px, targetX, alpha);
+  NAV.py = lerp(NAV.py, targetY, alpha);
+
   const dist = ship.pos.distanceTo(worldPos);
-  if(docked || dist<100){ ui.nav.style.display='none'; return; }
+  if(docked || dist<80){ ui.nav.style.display='none'; return; }
 
   ui.nav.style.display='flex';
-  ui.nav.style.left = `${x}px`;
-  ui.nav.style.top  = `${y}px`;
+  ui.nav.style.left = `${NAV.px}px`;
+  ui.nav.style.top  = `${NAV.py}px`;
+  ui.navName.textContent = NAV.currentName();
 
-  const ang=Math.atan2(y-h/2, x-w/2) + Math.PI/2;
+  const ang=Math.atan2(NAV.py-h/2, NAV.px-w/2) + Math.PI/2;
   ui.navArrow.style.transform = `rotate(${ang}rad)`;
   ui.navDist.textContent = dist.toFixed(0);
 }
@@ -997,21 +881,10 @@ function updateScreenFX(dt){
     retHit=pick.hit; currentTarget = pick.hit ? pick.rock : null; showTarget(currentTarget);
   }
   const root=document.documentElement.style;
-  if(retHit){
-    root.setProperty('--ret','rgba(120,255,180,.95)');
-    root.setProperty('--retGlow','rgba(120,255,180,.65)');
-    root.setProperty('--retGlow2','rgba(120,255,180,.45)');
-    root.setProperty('--retScale','1.08');
-  }else{
-    root.setProperty('--ret','rgba(173,216,255,.9)');
-    root.setProperty('--retGlow','rgba(120,180,255,.55)');
-    root.setProperty('--retGlow2','rgba(120,180,255,.35)');
-    root.setProperty('--retScale','1');
-  }
-  fovKick = lerp(fovKick, 0, Math.min(1, dt*6));
-  camera.fov = baseFov + fovKick; camera.updateProjectionMatrix();
-  flashAmt = lerp(flashAmt, 0, Math.min(1, dt*6));
-  ui.flash.style.opacity = flashAmt.toFixed(3);
+  if(retHit){ root.setProperty('--ret','rgba(120,255,180,.95)'); root.setProperty('--retGlow','rgba(120,255,180,.65)'); root.setProperty('--retGlow2','rgba(120,255,180,.45)'); root.setProperty('--retScale','1.08'); }
+  else { root.setProperty('--ret','rgba(173,216,255,.9)'); root.setProperty('--retGlow','rgba(120,180,255,.55)'); root.setProperty('--retGlow2','rgba(120,180,255,.35)'); root.setProperty('--retScale','1'); }
+  fovKick = lerp(fovKick, 0, Math.min(1, dt*6)); camera.fov = baseFov + fovKick; camera.updateProjectionMatrix();
+  flashAmt = lerp(flashAmt, 0, Math.min(1, dt*6)); ui.flash.style.opacity = flashAmt.toFixed(3);
 }
 let fpsAccum=0, fpsFrames=0;
 function updateFPS(dt){ if(!fpsOn || paused) return; fpsAccum+=dt; fpsFrames++; if(fpsAccum>=0.25){ const fps=(fpsFrames/fpsAccum); const ms=(1000/fps); ui.fps.textContent=`${fps.toFixed(0)} fps · ${ms.toFixed(1)} ms`; fpsAccum=0; fpsFrames=0; } }
@@ -1067,7 +940,6 @@ function handleInput(dt){
   if(keys['Space']) fireLaser();
   if(keys['KeyX'])  fireMissile();
 
-  // Dock / Undock
   if(keys['KeyC'] && docked){ closeDockPanel(); }
 }
 
@@ -1114,7 +986,6 @@ function updateFX(dt){
 
 function loop(){
   const dt=Math.min(0.033,clock.getDelta());
-
   handleInput(dt);
 
   if(!paused){
@@ -1131,10 +1002,10 @@ function loop(){
 
     updateMissiles(dt); updateDrops(dt); updateFX(dt);
     sun.position.copy(ship.pos).add(new THREE.Vector3(1,0.2,0.3).multiplyScalar(30000));
-  } else {
-    // While paused, still keep HUD nav updated
-    updateNavHUD(STATION.pos);
   }
+
+  // Nav runs even while paused (so the pointer doesn't freeze)
+  updateNavHUD(NAV.currentPos(), dt);
 
   updateUI(); renderer.render(scene,camera); requestAnimationFrame(loop);
 }
@@ -1150,33 +1021,34 @@ async function buildWorldAsync(s){
   for(const b of LASER_BEAMS){ removeBeam(b); } LASER_BEAMS.length=0;
   for(let i=MISSILES.length-1;i>=0;i--){ scene.remove(MISSILES[i].mesh); } MISSILES.length=0;
   for(let i=FX.group.children.length-1;i>=0;i--){ const n=FX.group.children[i]; FX.group.remove(n); n.geometry?.dispose?.(); n.material?.dispose?.(); }
-  await nextFrame();
+  clearFieldFX(); await nextFrame();
 
-  Loader.pct(0.10); Loader.sub('Drops & field'); resetDrops();
+  Loader.pct(0.10); Loader.sub('Drops & field…'); resetDrops();
 
   Loader.pct(0.12); Loader.sub('Populating asteroid fields…'); await buildAsteroidsAsync(s, (msg)=>Loader.sub(msg)); Loader.pct(0.62);
 
-  // Skydome
   Loader.sub('Skydome'); if(skydome){ scene.remove(skydome); skydome.geometry.dispose(); skydome.material.dispose(); }
-  const skydomeSeed = s ^ 0xDEADBEEF; skydome = makeSkydome(skydomeSeed); scene.add(skydome); await nextFrame(); Loader.pct(0.70);
+  skydome = makeSkydome(s ^ 0xDEADBEEF); scene.add(skydome); await nextFrame(); Loader.pct(0.70);
 
-  // Stars
   Loader.sub('Seeding stars…'); if(stars) scene.remove(stars);
-  const starCount = (quality==='ultra') ? 24000 : 16000;
-  stars = await makeStarfieldAsync(s^0x1234, starCount, 90000, (msg)=>Loader.sub(msg));
-  scene.add(stars); Loader.pct(0.90);
+  const starCount = (quality==='ultra') ? 22000 : 15000;
+  stars = await makeStarfieldAsync(s^0x1234, starCount, 70000, (msg)=>Loader.sub(msg));
+  scene.add(stars); Loader.pct(0.88);
 
-  // Planets
-  Loader.sub('Placing planets…');
-  // Just light background planets; omit distinct references to manage resources
-  await nextFrame(); Loader.pct(0.94);
+  Loader.sub('Spinning up station…'); buildStation(); await nextFrame(); Loader.pct(0.94);
 
-  Loader.sub('Spinning up station…'); buildStation(); await nextFrame(); Loader.pct(1.0);
+  // Start inside Field A (near origin)
+  const startField = FIELDS[0]?.center || new THREE.Vector3();
+  const jitter = new THREE.Vector3((Math.random()-0.5)*200,(Math.random()-0.5)*120,(Math.random()-0.5)*200);
+  ship.pos.copy(startField).add(jitter); ship.vel.set(0,0,0); ship.quat.identity();
 
-  ship.pos.set(0,0,0); ship.vel.set(0,0,0); ship.quat.identity();
   ship.laser.heat=0; ship.laser.over=false; ship.laser._cd=0; ship.missile.heat=0; ship.missile.over=false; ship.missile._cd=0;
   ship.boost.val = ship.boost.cap;
-  ui.seed.textContent=s; ui.cap.textContent=ship.cargoCap; updateUI(); Loader.hide();
+
+  // Reset NAV to Station by default
+  NAV.targetIdx = 0; ui.navName.textContent = NAV.currentName();
+
+  ui.seed.textContent=s; ui.cap.textContent=ship.cargoCap; updateUI(); Loader.pct(1.0); Loader.hide();
 }
 
 /* ---------- Boot ---------- */
@@ -1184,7 +1056,6 @@ function onResize(){ renderer.setSize(innerWidth,innerHeight); camera.aspect=inn
 addEventListener('resize',onResize);
 
 function attachGlobalShortcuts(){
-  // Docking key inside modal
   document.addEventListener('keydown',(e)=>{
     if(e.code==='KeyC' && docked){ closeDockPanel(); }
     if(e.code==='Escape' && ui.optMask.style.display==='flex'){ closeOptions(); }
@@ -1193,11 +1064,8 @@ function attachGlobalShortcuts(){
 
 async function init(){
   loadSettings();
-  autoLevel = Settings.autoLevel;
-  baseFov = Settings.fov||75;
-  camera.fov=baseFov; camera.updateProjectionMatrix();
-  quality = Settings.quality||quality;
-  ui.qual.textContent=(quality==='ultra')?'Ultra':'High';
+  autoLevel = Settings.autoLevel; baseFov = Settings.fov||75; quality = Settings.quality||quality;
+  camera.fov=baseFov; camera.updateProjectionMatrix(); ui.qual.textContent=(quality==='ultra')?'Ultra':'High';
 
   bindShop(); load(); applyUpgrades();
   ui.seed.textContent=seed; refreshShop();
