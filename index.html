@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>AstroMiner — Laser Fix + NPC Trawlers • Mouse Throttle & MMB Roll</title>
+<title>AstroMiner — Performance Rescue • Pooled Loot Flares • Dynamic Res</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   :root{
@@ -180,14 +180,16 @@ const lerp=THREE.MathUtils.lerp;
 const nextFrame=()=>new Promise(r=>requestAnimationFrame(r));
 function rng(seed){ let s=seed>>>0; return ()=>{ s+=0x6D2B79F5; let t=Math.imul(s^(s>>>15),1|s); t^=t+Math.imul(t^(t>>>7),61|t); return ((t^(t>>>14))>>>0)/4294967296; }; }
 
-/* ---------- Scene ---------- */
+/* ---------- Scene (no logarithmic depth) ---------- */
 const app=document.getElementById('app');
 const scene=new THREE.Scene();
-const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,0.3,260000); // lowered near to avoid clipping beams
+const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,0.3,260000);
 camera.position.set(0,0,0);
-const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,logarithmicDepthBuffer:true,powerPreference:'high-performance'});
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth,innerHeight);
+const DPR_MAX=Math.min(devicePixelRatio,2), DPR_MIN=0.6;
+let currentDPR=Math.min(devicePixelRatio,2);
+renderer.setPixelRatio(currentDPR); renderer.setSize(innerWidth,innerHeight);
 renderer.domElement.style.outline='none';
 renderer.domElement.tabIndex = 1;
 app.appendChild(renderer.domElement);
@@ -336,18 +338,10 @@ const eyeLocal = new THREE.Vector3(0,0,0);
 function hardpointWorld(local){ return local.clone().applyQuaternion(ship.quat).add(ship.pos); }
 
 /* ---------- Mouse aim + Wheel throttle + MMB roll ---------- */
-const MOUSE={
-  yaw:0,pitch:0,roll:0,
-  fireL:false,fireR:false,mmb:false,locked:false,
-  sens:0.0022, sensRoll:0.0032,
-  throttle:0 // [-1..1]
-};
+const MOUSE={ yaw:0,pitch:0,roll:0, fireL:false,fireR:false,mmb:false,locked:false, sens:0.0022, sensRoll:0.0032, throttle:0 };
 function updateMouseHint(){ ui.mouseHint.classList.toggle('hide', !Settings.mouseAim || MOUSE.locked || paused); }
 renderer.domElement.addEventListener('contextmenu',e=>{ e.preventDefault(); });
-renderer.domElement.addEventListener('click',()=>{
-  if(!Settings.mouseAim) return;
-  try{ renderer.domElement.requestPointerLock({unadjustedMovement:true}); }catch{ renderer.domElement.requestPointerLock?.(); }
-});
+renderer.domElement.addEventListener('click',()=>{ if(!Settings.mouseAim) return; try{ renderer.domElement.requestPointerLock({unadjustedMovement:true}); }catch{ renderer.domElement.requestPointerLock?.(); }});
 document.addEventListener('pointerlockchange',()=>{
   MOUSE.locked = (document.pointerLockElement===renderer.domElement);
   renderer.domElement.style.cursor = MOUSE.locked?'none':'auto';
@@ -357,53 +351,22 @@ document.addEventListener('pointerlockchange',()=>{
 renderer.domElement.addEventListener('mousemove',(e)=>{
   if(!Settings.mouseAim || !MOUSE.locked) return;
   const dx = -e.movementX, dy = -e.movementY;
-  if(MOUSE.mmb){
-    MOUSE.roll  += dx * MOUSE.sensRoll;
-    MOUSE.pitch += dy * MOUSE.sens;
-  }else{
-    MOUSE.yaw   += dx * MOUSE.sens;
-    MOUSE.pitch += dy * MOUSE.sens;
-  }
+  if(MOUSE.mmb){ MOUSE.roll += dx*MOUSE.sensRoll; MOUSE.pitch += dy*MOUSE.sens; }
+  else { MOUSE.yaw += dx*MOUSE.sens; MOUSE.pitch += dy*MOUSE.sens; }
 });
-function onMouseDown(e){
-  if(!Settings.mouseAim) return;
-  if(e.button===0){ MOUSE.fireL=true; }
-  if(e.button===2){ MOUSE.fireR=true; }
-  if(e.button===1){ e.preventDefault(); MOUSE.mmb=true; }
-}
-function onMouseUp(e){
-  if(e.button===0){ MOUSE.fireL=false; }
-  if(e.button===2){ MOUSE.fireR=false; }
-  if(e.button===1){ MOUSE.mmb=false; }
-}
-renderer.domElement.addEventListener('mousedown', onMouseDown);
-document.addEventListener('mouseup', onMouseUp);
+renderer.domElement.addEventListener('mousedown',e=>{ if(!Settings.mouseAim) return; if(e.button===0) MOUSE.fireL=true; if(e.button===2) MOUSE.fireR=true; if(e.button===1){ e.preventDefault(); MOUSE.mmb=true; }});
+document.addEventListener('mouseup',e=>{ if(e.button===0) MOUSE.fireL=false; if(e.button===2) MOUSE.fireR=false; if(e.button===1) MOUSE.mmb=false; });
 window.addEventListener('blur',()=>{ MOUSE.fireL=false; MOUSE.fireR=false; MOUSE.mmb=false; });
-
-// Wheel throttle
-function onWheel(e){
-  if(e.target!==renderer.domElement) return;
-  e.preventDefault();
-  if(paused) return;
-  const raw = (e.deltaMode===1 ? e.deltaY*16 : e.deltaMode===2 ? e.deltaY*800 : e.deltaY);
-  const step = clamp(-raw/800, -0.25, 0.25);
-  MOUSE.throttle = clamp(MOUSE.throttle + step, -1, 1);
+renderer.domElement.addEventListener('wheel', e=>{
+  if(e.target!==renderer.domElement) return; e.preventDefault(); if(paused) return;
+  const raw=(e.deltaMode===1?e.deltaY*16:e.deltaMode===2?e.deltaY*800:e.deltaY);
+  const step = clamp(-raw/800, -0.25, 0.25); MOUSE.throttle = clamp(MOUSE.throttle + step, -1, 1);
   ui.thrustPct.textContent = Math.round(MOUSE.throttle*100);
-}
-renderer.domElement.addEventListener('wheel', onWheel, {passive:false});
+},{passive:false});
 
-/* ---------- Upgrades & Shop ---------- */
-const upgrades={
-  laserD:1, laserC:1, rof:1, missD:1, missC:1,
-  thrust:1, turn:1, brake:1, magnet:1,
-  range:1, hold:1, yield:1, boost:1, scan:1, target:1,
-  lightning:false, mass:false, grav:false
-};
-const baseCosts={
-  laserD:200, laserC:150, rof:240, missD:300, missC:220,
-  thrust:250, turn:200, brake:140, magnet:180,
-  range:260, hold:220, yield:300, boost:280, scan:230, target:260
-};
+/* ---------- Upgrades / Shop / Save ---------- */
+const upgrades={ laserD:1, laserC:1, rof:1, missD:1, missC:1, thrust:1, turn:1, brake:1, magnet:1, range:1, hold:1, yield:1, boost:1, scan:1, target:1, lightning:false, mass:false, grav:false };
+const baseCosts={ laserD:200, laserC:150, rof:240, missD:300, missC:220, thrust:250, turn:200, brake:140, magnet:180, range:260, hold:220, yield:300, boost:280, scan:230, target:260 };
 const MAX={ laserD:8, laserC:8, rof:7, missD:8, missC:7, thrust:8, turn:8, brake:6, magnet:8, range:8, hold:8, yield:6, boost:6, scan:6, target:6 };
 function levelCost(base,lv){ return Math.round(base * Math.pow(1.6, lv-1)); }
 function applyUpgrades(){
@@ -438,12 +401,9 @@ function applyUpgrades(){
 
   ship.seekStrength = clamp(0.02 + (upgrades.target-1)*0.006, 0.02, 0.05);
 }
-
-/* ---------- Shop wiring ---------- */
 function refreshShop(){
   const C=ui.buttons, cVals={}, set=(k)=>cVals[k]=levelCost(baseCosts[k], upgrades[k]+1);
   ['laserD','laserC','rof','missD','missC','thrust','turn','brake','magnet','range','hold','yield','boost','scan','target'].forEach(set);
-
   const setLv=(id,val)=>{ byId(id).textContent=val; };
   setLv('lvLaserD',upgrades.laserD); setLv('lvLaserC',upgrades.laserC); setLv('lvRof',upgrades.rof);
   setLv('lvMissD',upgrades.missD); setLv('lvMissC',upgrades.missC);
@@ -492,8 +452,6 @@ function bindShop(){
   B.buyScan.addEventListener('click',()=>tryBuy('scan','Scanner'));
   B.buyTarget.addEventListener('click',()=>tryBuy('target','Targeting Computer'));
 }
-
-/* ---------- Saving ---------- */
 const LSKEY='astrominer_save_v1';
 function save(){ localStorage.setItem(LSKEY, JSON.stringify({seed,quality,credits:ship.credits,cargo:ship.cargo,upgrades})); }
 function load(){ try{ const j=localStorage.getItem(LSKEY); if(!j) return; const d=JSON.parse(j);
@@ -549,10 +507,9 @@ let quality='high', seed=(Math.random()*1e9)|0;
 const AST={ inst:[], data:[], count:0 };
 const DROPS={ inst:null, data:[], count:0, cap:0, geo:null, mat:null };
 const MISSILES=[], LASER_BEAMS=[];
-const TRAWLERS=[]; // NPC ships
+const TRAWLERS=[];
+let FIELDS=[];
 
-/* Field positions & dust */
-let FIELDS=[]; // {center:Vector3}
 const FIELD_FX={ group:new THREE.Group(), dust:[] }; scene.add(FIELD_FX.group);
 function clearFieldFX(){ for(const s of FIELD_FX.dust){ FIELD_FX.group.remove(s); s.material.map.dispose(); s.material.dispose(); } FIELD_FX.dust.length=0; }
 function buildFieldFX(startCenter,clearR){
@@ -561,8 +518,7 @@ function buildFieldFX(startCenter,clearR){
   for(const f of FIELDS){
     for(let i=0;i<2;i++){
       const s=new THREE.Sprite(new THREE.SpriteMaterial({map:dustTex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.18}));
-      let pos;
-      let tries=0;
+      let pos; let tries=0;
       do{
         pos=f.center.clone().add(new THREE.Vector3((Math.random()-0.5)*400,(Math.random()-0.5)*150,(Math.random()-0.5)*400));
         tries++;
@@ -614,7 +570,7 @@ async function buildAsteroidsAsync(seed, progress){
 
   const R=rng(seed^0xBEEF);
   const fields = (quality==='ultra')?6:4;
-  const basePerField = (quality==='ultra')?850:650;
+  const basePerField = (quality==='ultra')?780:520; /* slightly reduced for perf */
   const baseCount = basePerField * fields;
 
   const frac = { rock:0.90, crystal:0.06, metal:0.03, giants:0.01 };
@@ -689,7 +645,7 @@ async function buildAsteroidsAsync(seed, progress){
   for(let f=0; f<fields; f++){
     const rocks=rockPer+(rRem-->0?1:0);
     const crystalsBase=crystalPer+(cRem-->0?1:0);
-    const crystals = (f===0)?Math.floor(crystalsBase*0.5):crystalsBase;
+    const crystals = (f===0)?Math.floor(crystalsBase*0.5):crystalsBase; // fewer at start
     const metals=metalPer+(mRem-->0?1:0);
 
     for(let i=0;i<clustersPer;i++){
@@ -717,24 +673,32 @@ async function buildAsteroidsAsync(seed, progress){
   buildFieldFX(START_CENTER, START_CLEAR_R);
 }
 
-/* ---------- Drops ---------- */
+/* ---------- Drops + PERF: pooled flares ---------- */
 function resetDrops(){
   if(DROPS.inst){ scene.remove(DROPS.inst); DROPS.inst.geometry.dispose(); DROPS.inst.material.dispose(); }
   DROPS.count=0; DROPS.data=[]; DROPS.geo=new THREE.OctahedronGeometry(1,0);
   DROPS.mat = new THREE.MeshBasicMaterial({vertexColors:true, transparent:true, opacity:0.95, blending:THREE.AdditiveBlending, side:THREE.DoubleSide, depthWrite:false});
-  DROPS.cap=(quality==='ultra'?5000:3200);
+  DROPS.cap=(quality==='ultra'?3200:2200); // lower cap for perf
   DROPS.inst=new THREE.InstancedMesh(DROPS.geo,DROPS.mat,DROPS.cap);
   DROPS.inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   DROPS.inst.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(DROPS.cap*3),3);
   scene.add(DROPS.inst);
 }
 const glowTexLoot=makeGlowTexture(128,0.0,0.55,'rgba(255,240,140,1)');
+const LOOT={ pool:[], reverse:[], assigned:new Map(), budget:0, last:0 };
+function destroyLootFlares(){ for(const s of LOOT.pool){ scene.remove(s); s.material.map.dispose(); s.material.dispose(); } LOOT.pool.length=0; LOOT.reverse.length=0; LOOT.assigned.clear(); }
+function setupLootFlares(){
+  destroyLootFlares();
+  LOOT.budget = (quality==='ultra') ? 220 : 140;
+  for(let i=0;i<LOOT.budget;i++){
+    const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexLoot,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false,opacity:0.85}));
+    sp.visible=false; sp.renderOrder=1; scene.add(sp); LOOT.pool.push(sp); LOOT.reverse[i]=undefined;
+  }
+}
 function spawnDrop(pos,value,color,scale=1.4){
   if(DROPS.count>=DROPS.cap) return;
   const id=DROPS.count++, vel=new THREE.Vector3((Math.random()-0.5)*3,(Math.random()-0.5)*3,(Math.random()-0.5)*3);
-  const flare=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexLoot,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,depthTest:true,opacity:0.9,color:new THREE.Color(color)}));
-  flare.renderOrder = 1; flare.position.copy(pos); flare.scale.setScalar(Math.min(32,scale*1.8)); scene.add(flare);
-  DROPS.data[id]={pos:pos.clone(),vel,value,alive:true,color,scale,flare};
+  DROPS.data[id]={pos:pos.clone(),vel,value,alive:true,color,scale,flareSlot:-1};
   const m=new THREE.Matrix4().compose(DROPS.data[id].pos,new THREE.Quaternion(),new THREE.Vector3(scale,scale,scale));
   DROPS.inst.setMatrixAt(id,m); DROPS.inst.setColorAt(id,new THREE.Color(color)); DROPS.inst.count=DROPS.count;
   DROPS.inst.instanceMatrix.needsUpdate=true; DROPS.inst.instanceColor.needsUpdate=true;
@@ -749,83 +713,78 @@ function addDropsOnDestroy(a){
   }
 }
 function maybeChipLoot(p){ if(Math.random()<0.2) spawnDrop(p,Math.round(10+Math.random()*10),0xc0c0ff,1.2); }
-function destroyAsteroid(rec){
-  if(!rec.alive) return; rec.alive=false;
-  const inst=AST.inst[rec.gi], m=new THREE.Matrix4();
-  m.compose(new THREE.Vector3(999999,999999,999999),new THREE.Quaternion(),new THREE.Vector3(0.0001,0.0001,0.0001));
-  inst.setMatrixAt(rec.idx,m); inst.instanceMatrix.needsUpdate=true;
-  addDropsOnDestroy(rec); spawnExplosion(new THREE.Vector3(rec.x,rec.y,rec.z),rec.size);
+function reassignLootFlares(dt){
+  LOOT.last += dt; if(LOOT.last<0.15) return; LOOT.last=0;
+  const cand=[];
+  const sx=ship.pos.x, sy=ship.pos.y, sz=ship.pos.z; const maxD2=2600*2600;
+  for(let i=0;i<DROPS.count;i++){
+    const d=DROPS.data[i]; if(!d||!d.alive) continue;
+    const dx=sx-d.pos.x, dy=sy-d.pos.y, dz=sz-d.pos.z; const d2=dx*dx+dy*dy+dz*dz;
+    if(d2<=maxD2) cand.push([d2,i]);
+  }
+  cand.sort((a,b)=>a[0]-b[0]);
+  const selected=new Set(); const cap=Math.min(LOOT.pool.length,cand.length);
+  for(let k=0;k<cap;k++) selected.add(cand[k][1]);
+
+  // Release those not selected
+  for(const [dropIdx, poolIdx] of LOOT.assigned){
+    if(!selected.has(dropIdx)){
+      const sp=LOOT.pool[poolIdx]; sp.visible=false;
+      LOOT.assigned.delete(dropIdx); LOOT.reverse[poolIdx]=undefined;
+      const d=DROPS.data[dropIdx]; if(d) d.flareSlot=-1;
+    }
+  }
+  // Assign new ones
+  const avail=[]; for(let i=0;i<LOOT.pool.length;i++){ if(LOOT.reverse[i]==null) avail.push(i); }
+  for(const idx of selected){
+    const d=DROPS.data[idx]; if(!d) continue;
+    if(LOOT.assigned.has(idx)) continue;
+    if(!avail.length) break;
+    const pidx=avail.pop(); LOOT.assigned.set(idx,pidx); LOOT.reverse[pidx]=idx; d.flareSlot=pidx;
+    const sp=LOOT.pool[pidx]; sp.position.copy(d.pos); sp.scale.setScalar(Math.min(32,d.scale*1.8)); sp.visible=true;
+  }
 }
 
-/* ---------- NPC: Trawlers ---------- */
+/* ---------- NPC: Trawlers (unchanged logic) ---------- */
 function makeTrawlerMesh(seed){
   const g=new THREE.Group();
-  const hull=new THREE.Mesh(
-    new THREE.CapsuleGeometry(10,60,6,12),
-    new THREE.MeshStandardMaterial({color:0x3a4d62, metalness:0.7, roughness:0.45})
-  );
-  hull.rotation.z=Math.PI/2;
-  g.add(hull);
+  const hull=new THREE.Mesh(new THREE.CapsuleGeometry(10,60,6,12), new THREE.MeshStandardMaterial({color:0x3a4d62, metalness:0.7, roughness:0.45}));
+  hull.rotation.z=Math.PI/2; g.add(hull);
   const podMat=new THREE.MeshStandardMaterial({color:0x7088a0, metalness:0.6, roughness:0.5});
-  for(let i=0;i<6;i++){
-    const pod=new THREE.Mesh(new THREE.BoxGeometry(12,10,10), podMat.clone());
-    pod.position.set(-20+i*10, (i%2?12:-12), 0);
-    g.add(pod);
-  }
+  for(let i=0;i<6;i++){ const pod=new THREE.Mesh(new THREE.BoxGeometry(12,10,10), podMat.clone()); pod.position.set(-20+i*10, (i%2?12:-12), 0); g.add(pod); }
   const tTex=makeGlowTexture(256,0.0,0.7,'rgba(120,200,255,1)');
-  const t1=new THREE.Sprite(new THREE.SpriteMaterial({map:tTex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false,opacity:0.7}));
-  const t2=t1.clone();
-  t1.position.set(40, 7, 0); t2.position.set(40,-7,0);
-  t1.scale.set(22,22,1); t2.scale.set(22,22,1);
-  g.add(t1,t2);
-  g.frustumCulled=false;
-  return g;
+  const t1=new THREE.Sprite(new THREE.SpriteMaterial({map:tTex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false,opacity:0.7})), t2=t1.clone();
+  t1.position.set(40, 7, 0); t2.position.set(40,-7,0); t1.scale.set(22,22,1); t2.scale.set(22,22,1); g.add(t1,t2);
+  g.frustumCulled=false; return g;
 }
 function spawnTrawlers(){
   for(let i=TRAWLERS.length-1;i>=0;i--){ scene.remove(TRAWLERS[i].mesh); }
   TRAWLERS.length=0;
-
-  const R=rng(seed^0x5151);
-  const count = (quality==='ultra')?3:2;
+  const R=rng(seed^0x5151); const count=(quality==='ultra')?2:2; // kept small for perf
   for(let i=0;i<count;i++){
-    const fIdx = 1 + Math.floor(R()*Math.max(1,FIELDS.length-1));
-    const from = FIELDS[fIdx].center.clone();
-    const to   = (R()<0.5)? STATION.pos.clone() : FIELDS[Math.floor(R()*FIELDS.length)].center.clone();
+    const fIdx=1+Math.floor(R()*Math.max(1,FIELDS.length-1)); const from=FIELDS[fIdx].center.clone();
+    const to=(R()<0.5)?STATION.pos.clone():FIELDS[Math.floor(R()*FIELDS.length)].center.clone();
     const mesh=makeTrawlerMesh(seed^i);
     const pos=from.clone().add(new THREE.Vector3((R()*2-1)*120,(R()*2-1)*60,(R()*2-1)*120));
-    mesh.position.copy(pos);
-    scene.add(mesh);
-    TRAWLERS.push({
-      mesh, pos, vel:new THREE.Vector3(), hp:1200+(R()*400|0), radius:20,
-      from, to, speed:120+(R()*30), cargo: 300+Math.floor(R()*600), t:0, dying:false
-    });
+    mesh.position.copy(pos); scene.add(mesh);
+    TRAWLERS.push({mesh,pos,vel:new THREE.Vector3(),hp:1200+(R()*400|0),radius:20,from,to,speed:120+(R()*30),cargo:300+Math.floor(R()*600),dying:false});
   }
 }
 function destroyTrawler(t){
-  if(t.dying) return; t.dying=true;
-  spawnExplosion(t.pos, 6);
+  if(t.dying) return; t.dying=true; spawnExplosion(t.pos,6);
   const n=8+Math.floor(Math.random()*8);
-  for(let i=0;i<n;i++){
-    const off=new THREE.Vector3(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5).multiplyScalar(40);
-    const p=t.pos.clone().add(off);
-    const val = Math.round(t.cargo/n * (0.6+Math.random()*0.8));
-    spawnDrop(p, val, 0xffd54a, 4+Math.random()*3);
+  for(let i=0;i<n;i++){ const off=new THREE.Vector3(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5).multiplyScalar(40);
+    const p=t.pos.clone().add(off); const val=Math.round(t.cargo/n*(0.6+Math.random()*0.8));
+    spawnDrop(p,val,0xffd54a,4+Math.random()*3);
   }
-  scene.remove(t.mesh);
-  const idx=TRAWLERS.indexOf(t); if(idx>=0) TRAWLERS.splice(idx,1);
+  scene.remove(t.mesh); const idx=TRAWLERS.indexOf(t); if(idx>=0) TRAWLERS.splice(idx,1);
 }
 function updateTrawlers(dt){
   for(const t of TRAWLERS){
-    const dir=t.to.clone().sub(t.pos); const dist=dir.length(); if(dist<80){
-      const tmp=t.from; t.from=t.to; t.to=tmp; t.cargo=300+Math.floor(Math.random()*600);
-    } else {
-      dir.normalize();
-      t.vel.lerp(dir.multiplyScalar(t.speed), 0.6*dt);
-      t.pos.addScaledVector(t.vel, dt);
-      t.mesh.position.copy(t.pos);
-      const look = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1,0,0), t.vel.clone().normalize());
-      if(isFinite(look.x)) t.mesh.quaternion.slerp(look, 0.15);
-    }
+    const dir=t.to.clone().sub(t.pos); const dist=dir.length();
+    if(dist<80){ const tmp=t.from; t.from=t.to; t.to=tmp; t.cargo=300+Math.floor(Math.random()*600); }
+    else { dir.normalize(); t.vel.lerp(dir.multiplyScalar(t.speed), 0.6*dt); t.pos.addScaledVector(t.vel,dt); t.mesh.position.copy(t.pos);
+      const look=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1,0,0), t.vel.clone().normalize()); if(isFinite(look.x)) t.mesh.quaternion.slerp(look,0.15); }
   }
 }
 
@@ -846,37 +805,22 @@ function spawnExplosion(pos,scale){
   if(pct>0){ addShake(0.6*pct, 0.25+0.2*pct); AUD.boom(); screenFlash(0.12*pct); triggerKick(1.2*pct); }
 }
 
-/* ---- LASER BEAM FIX ---- */
+/* ---- Laser visibility (no depth test) ---- */
 function createLaserBeam(start,end){
   const dir=end.clone().sub(start), len=Math.max(0.001,dir.length()), dirN=dir.clone().normalize();
   const gCore=new THREE.CylinderGeometry(1.3,1.3,1,18,1,true);
-  const mCore=new THREE.MeshBasicMaterial({
-    color:0x88ccff,transparent:true,opacity:0.95,
-    blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false
-  });
+  const mCore=new THREE.MeshBasicMaterial({color:0x88ccff,transparent:true,opacity:0.95,blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false});
   const core=new THREE.Mesh(gCore,mCore);
-
   const gGlow=new THREE.CylinderGeometry(2.6,2.6,1,18,1,true);
-  const mGlow=new THREE.MeshBasicMaterial({
-    color:0x66aaff,transparent:true,opacity:0.35,
-    blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false
-  });
+  const mGlow=new THREE.MeshBasicMaterial({color:0x66aaff,transparent:true,opacity:0.35,blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false});
   const glow=new THREE.Mesh(gGlow,mGlow);
-
   const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),dirN);
   core.quaternion.copy(q); glow.quaternion.copy(q);
-
-  const startSprite=new THREE.Sprite(new THREE.SpriteMaterial({
-    map:glowTexBlue,transparent:true,depthWrite:false,depthTest:false,blending:THREE.AdditiveBlending,opacity:0.95
-  }));
-  const endSprite  =new THREE.Sprite(new THREE.SpriteMaterial({
-    map:glowTexBlue,transparent:true,depthWrite:false,depthTest:false,blending:THREE.AdditiveBlending,opacity:0.95
-  }));
+  const startSprite=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexBlue,transparent:true,depthWrite:false,depthTest:false,blending:THREE.AdditiveBlending,opacity:0.95}));
+  const endSprite  =new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexBlue,transparent:true,depthWrite:false,depthTest:false,blending:THREE.AdditiveBlending,opacity:0.95}));
   startSprite.scale.set(7,7,1); endSprite.scale.set(9,9,1);
-
   core.frustumCulled=false; glow.frustumCulled=false; startSprite.frustumCulled=false; endSprite.frustumCulled=false;
   core.renderOrder=10; glow.renderOrder=10; startSprite.renderOrder=11; endSprite.renderOrder=11;
-
   scene.add(core,glow,startSprite,endSprite);
   return {start:start.clone(),dir:dirN,len,mesh:core,outer:glow,startGlow:startSprite,endGlow:endSprite,t:0,life:0.22,growTime:0.06};
 }
@@ -889,33 +833,36 @@ function updateBeam(b,dt){
 }
 function removeBeam(b){
   scene.remove(b.mesh,b.outer,b.startGlow,b.endGlow);
-  b.mesh.geometry.dispose(); b.mesh.material.dispose();
-  b.outer.geometry.dispose(); b.outer.material.dispose();
-  b.startGlow.material.dispose(); b.endGlow.material.dispose();
+  b.mesh.geometry.dispose(); b.mesh.material.dispose(); b.outer.geometry.dispose(); b.outer.material.dispose(); b.startGlow.material.dispose(); b.endGlow.material.dispose();
 }
 function triggerKick(k){ fovKick=Math.min(4, fovKick + k); }
 function screenFlash(a){ flashAmt=Math.min(1, flashAmt+a); }
 
-/* ---------- World Ray Tests (asteroids + trawlers) ---------- */
+/* ---------- Ray tests (allocation-free) ---------- */
+const _tmpPoint=new THREE.Vector3();
 function rayHitAsteroids(origin,dir,maxRange){
+  const ox=origin.x, oy=origin.y, oz=origin.z, dx=dir.x, dy=dir.y, dz=dir.z;
   let bestT=Infinity,best=null;
   for(const a of AST.data){ if(!a.alive) continue;
-    const C=new THREE.Vector3(a.x,a.y,a.z), r=a.size, L=C.clone().sub(origin);
-    const tca=L.dot(dir); if(tca<0) continue; const d2=L.lengthSq()-tca*tca; if(d2>r*r) continue;
-    const thc=Math.sqrt(Math.max(0,r*r-d2)); const t0=tca-thc; if(t0>0&&t0<bestT){ bestT=t0; best=a; }
+    const lx=a.x-ox, ly=a.y-oy, lz=a.z-oz;
+    const tca=lx*dx+ly*dy+lz*dz; if(tca<0) continue;
+    const ll=lx*lx+ly*ly+lz*lz; const d2=ll - tca*tca; const rr=a.size*a.size; if(d2>rr) continue;
+    const t0=tca - Math.sqrt(rr-d2); if(t0>0 && t0<bestT){ bestT=t0; best=a; }
   }
-  if(best && bestT<=maxRange) return {hit:true,t:bestT,kind:'asteroid',rock:best,point:origin.clone().addScaledVector(dir, bestT)};
-  return {hit:false,t:maxRange,kind:null,rock:null,point:origin.clone().addScaledVector(dir,maxRange)};
+  if(best && bestT<=maxRange){ _tmpPoint.set(ox+dx*bestT, oy+dy*bestT, oz+dz*bestT); return {hit:true,t:bestT,kind:'asteroid',rock:best,point:_tmpPoint.clone()}; }
+  _tmpPoint.set(ox+dx*maxRange, oy+dy*maxRange, oz+dz*maxRange); return {hit:false,t:maxRange,kind:null,rock:null,point:_tmpPoint.clone()};
 }
 function rayHitTrawlers(origin,dir,maxRange){
+  const ox=origin.x, oy=origin.y, oz=origin.z, dx=dir.x, dy=dir.y, dz=dir.z;
   let bestT=Infinity,best=null;
   for(const s of TRAWLERS){
-    const C=s.pos, r=s.radius, L=C.clone().sub(origin);
-    const tca=L.dot(dir); if(tca<0) continue; const d2=L.lengthSq()-tca*tca; if(d2>r*r) continue;
-    const thc=Math.sqrt(Math.max(0,r*r-d2)); const t0=tca-thc; if(t0>0&&t0<bestT){ bestT=t0; best=s; }
+    const lx=s.pos.x-ox, ly=s.pos.y-oy, lz=s.pos.z-oz;
+    const tca=lx*dx+ly*dy+lz*dz; if(tca<0) continue;
+    const ll=lx*lx+ly*ly+lz*lz; const d2=ll - tca*tca; const rr=s.radius*s.radius; if(d2>rr) continue;
+    const t0=tca - Math.sqrt(rr-d2); if(t0>0 && t0<bestT){ bestT=t0; best=s; }
   }
-  if(best && bestT<=maxRange) return {hit:true,t:bestT,kind:'trawler',ship:best,point:origin.clone().addScaledVector(dir, bestT)};
-  return {hit:false,t:maxRange,kind:null,ship:null,point:origin.clone().addScaledVector(dir,maxRange)};
+  if(best && bestT<=maxRange){ _tmpPoint.set(ox+dx*bestT, oy+dy*bestT, oz+dz*bestT); return {hit:true,t:bestT,kind:'trawler',ship:best,point:_tmpPoint.clone()}; }
+  _tmpPoint.set(ox+dx*maxRange, oy+dy*maxRange, oz+dz*maxRange); return {hit:false,t:maxRange,kind:null,ship:null,point:_tmpPoint.clone()};
 }
 function rayHitWorld(origin,dir,maxRange){
   const a=rayHitAsteroids(origin,dir,maxRange);
@@ -931,22 +878,15 @@ function fireLaser(){
   L._cd=1/Math.max(3,ship.laser.rof);
   const {origin,dir}=getReticleRay(); const pick=rayHitWorld(origin,dir,ship.range); const endPoint=pick.point.clone();
   const startL=hardpointWorld(HP_LOCAL.laserL), startR=hardpointWorld(HP_LOCAL.laserR);
-  LASER_BEAMS.push(createLaserBeam(startL,endPoint)); LASER_BEAMS.push(createLaserBeam(startR,endPoint));
-  triggerKick(1.1); screenFlash(0.05); AUD.zap();
-
+  LASER_BEAMS.push(createLaserBeam(startL,endPoint)); LASER_BEAMS.push(createLaserBeam(startR,endPoint)); triggerKick(1.1); screenFlash(0.05); AUD.zap();
   if(pick.hit){
-    if(pick.kind==='asteroid'){
-      pick.rock.hp-=ship.laser.dmg; maybeChipLoot(endPoint); if(pick.rock.hp<=0) destroyAsteroid(pick.rock);
-    } else if(pick.kind==='trawler'){
-      pick.ship.hp -= ship.laser.dmg*0.6;
-      if(pick.ship.hp<=0) destroyTrawler(pick.ship);
-    }
+    if(pick.kind==='asteroid'){ pick.rock.hp-=ship.laser.dmg; maybeChipLoot(endPoint); if(pick.rock.hp<=0) destroyAsteroid(pick.rock); }
+    else if(pick.kind==='trawler'){ pick.ship.hp -= ship.laser.dmg*0.6; if(pick.ship.hp<=0) destroyTrawler(pick.ship); }
   }
 }
 function fireMissile(){
   const M=ship.missile; if(M.over||M._cd>0) return; M.heat+=M.shotHeat; if(M.heat>=100){ M.over=true; toast('Missiles overheated!'); }
-  M._cd=M.reload; const {dir}=getReticleRay(); spawnMissile(dir);
-  triggerKick(1.6); screenFlash(0.06);
+  M._cd=M.reload; const {dir}=getReticleRay(); spawnMissile(dir); triggerKick(1.6); screenFlash(0.06);
 }
 function spawnMissile(dir){
   const nose=hardpointWorld(HP_LOCAL.missile);
@@ -1064,11 +1004,9 @@ function showTarget(target){
   TARGET.group.scale.setScalar(size);
 
   ui.tgtHud.style.display='block';
-  if(target.kind==='trawler'){
-    ui.tgtHud.textContent = `trawler · ${Math.max(0,target.ship.hp|0)} HP · ${camera.position.distanceTo(pos).toFixed(0)} m`;
-  }else{
-    ui.tgtHud.textContent = `${target.rock.type||'asteroid'} · ${Math.max(0,target.rock.hp|0)} HP · ${camera.position.distanceTo(pos).toFixed(0)} m`;
-  }
+  ui.tgtHud.textContent = (target.kind==='trawler')
+    ? `trawler · ${Math.max(0,target.ship.hp|0)} HP · ${camera.position.distanceTo(pos).toFixed(0)} m`
+    : `${target.rock.type||'asteroid'} · ${Math.max(0,target.rock.hp|0)} HP · ${camera.position.distanceTo(pos).toFixed(0)} m`;
 }
 
 /* ---------- Nav (edge clamp + smoothing + cycle) ---------- */
@@ -1111,7 +1049,7 @@ function updateNavHUD(worldPos,dt){
   ui.navDist.textContent = dist.toFixed(0);
 }
 
-/* ---------- Loop ---------- */
+/* ---------- Loop + Dynamic Resolution ---------- */
 const clock=new THREE.Clock();
 let retTmr=0, lockTarget=null;
 function addShake(amp,t){ shakeAmp=Math.max(shakeAmp,amp); shakeT=Math.max(shakeT,t); }
@@ -1133,22 +1071,28 @@ function updateScreenFX(dt){
   fovKick = lerp(fovKick, 0, Math.min(1, dt*6)); camera.fov = baseFov + fovKick; camera.updateProjectionMatrix();
   flashAmt = lerp(flashAmt, 0, Math.min(1, dt*6)); ui.flash.style.opacity = flashAmt.toFixed(3);
 }
-let fpsAccum=0, fpsFrames=0;
-function updateFPS(dt){ if(!fpsOn || paused) return; fpsAccum+=dt; fpsFrames++; if(fpsAccum>=0.25){ const fps=(fpsFrames/fpsAccum); const ms=(1000/fps); ui.fps.textContent=`${fps.toFixed(0)} fps · ${ms.toFixed(1)} ms`; fpsAccum=0; fpsFrames=0; } }
+let fpsAccum=0, fpsFrames=0, fpsEMA=60, dprTimer=0;
+function updateFPS(dt){
+  if(paused) return;
+  fpsAccum+=dt; fpsFrames++; const inst=1/dt; fpsEMA = fpsEMA*0.9 + inst*0.1;
+  if(fpsOn && fpsAccum>=0.25){ const fps=(fpsFrames/fpsAccum), ms=(1000/fps); ui.fps.textContent=`${fps.toFixed(0)} fps · ${ms.toFixed(1)} ms · res ×${currentDPR.toFixed(2)}`; fpsAccum=0; fpsFrames=0; }
+}
+function adjustResolution(dt){
+  if(paused) return;
+  dprTimer+=dt; if(dprTimer<1.0) return; dprTimer=0;
+  if(fpsEMA<45 && currentDPR>DPR_MIN){ currentDPR=Math.max(DPR_MIN,currentDPR-0.05); renderer.setPixelRatio(currentDPR); renderer.setSize(innerWidth,innerHeight,false); }
+  else if(fpsEMA>58 && currentDPR<DPR_MAX){ currentDPR=Math.min(DPR_MAX,currentDPR+0.05); renderer.setPixelRatio(currentDPR); renderer.setSize(innerWidth,innerHeight,false); }
+}
 
 function handleInput(dt){
   if(paused) return;
-
   let yaw=((keys['KeyA']?1:0)-(keys['KeyD']?1:0))*ship.yawRate*dt;
   let pitch=((keys['KeyW']?1:0)-(keys['KeyS']?1:0))*ship.pitchRate*dt;
   let roll=((keys['KeyQ']?1:0)-(keys['KeyE']?1:0))*ship.rollRate*dt;
-
   if(Settings.mouseAim && MOUSE.locked){
     if(MOUSE.mmb){ roll += MOUSE.roll; } else { yaw += MOUSE.yaw; }
-    pitch += MOUSE.pitch;
-    MOUSE.yaw=0; MOUSE.pitch=0; MOUSE.roll=0;
+    pitch += MOUSE.pitch; MOUSE.yaw=0; MOUSE.pitch=0; MOUSE.roll=0;
   }
-
   const qYaw=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),yaw);
   const qPitch=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),pitch);
   const qRoll=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),-roll);
@@ -1158,17 +1102,17 @@ function handleInput(dt){
   const up =new THREE.Vector3(0,1,0).applyQuaternion(ship.quat);
   const right=new THREE.Vector3(1,0,0).applyQuaternion(ship.quat);
 
-  const throttle = MOUSE.throttle;
+  const throttle=MOUSE.throttle;
   const thrustFKeys=(keys['ArrowUp']?1:0)-(keys['ArrowDown']?1:0);
-  const forwardInput = clamp(throttle + thrustFKeys, -1, 1);
+  const forwardInput=clamp(throttle + thrustFKeys, -1, 1);
 
   const thrustX=(keys['ArrowRight']?1:0)-(keys['ArrowLeft']?1:0);
   const thrustY=(keys['KeyR']?1:0)-(keys['KeyF']?1:0);
 
-  const boosting = (keys['ShiftLeft']||keys['ShiftRight']) && (ship.boost.val>0.01);
-  const mult = boosting ? ship.boost.mult : 1.0;
-  if(boosting){ ship.boost.val = Math.max(0, ship.boost.val - dt); triggerKick(0.3); }
-  else { ship.boost.val = Math.min(ship.boost.cap, ship.boost.val + ship.boost.regen*dt); }
+  const boosting=(keys['ShiftLeft']||keys['ShiftRight']) && (ship.boost.val>0.01);
+  const mult=boosting?ship.boost.mult:1.0;
+  if(boosting){ ship.boost.val=Math.max(0, ship.boost.val - dt); triggerKick(0.3); }
+  else { ship.boost.val=Math.min(ship.boost.cap, ship.boost.val + ship.boost.regen*dt); }
 
   ship.vel.addScaledVector(fwd,forwardInput*ship.thrust*mult*dt);
   ship.vel.addScaledVector(right,thrustX*ship.strafe*mult*dt);
@@ -1187,44 +1131,46 @@ function updateMissiles(dt){
   for(let i=MISSILES.length-1;i>=0;i--){
     const m=MISSILES[i];
     const {origin,dir}=getReticleRay(); const pick=rayHitWorld(origin,dir,1600);
-    if(pick.hit){
-      const aim=pick.point.clone().sub(m.pos).normalize();
-      m.vel.lerp(aim.multiplyScalar(200), ship.seekStrength);
-    }
+    if(pick.hit){ const aim=pick.point.clone().sub(m.pos).normalize(); m.vel.lerp(aim.multiplyScalar(200), ship.seekStrength); }
     m.pos.addScaledVector(m.vel,dt); m.mesh.position.copy(m.pos); m.life-=dt;
     m.trailT=(m.trailT||0)+dt; if(m.trailT>0.03){ m.trailT=0; const s=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexOrange,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false,opacity:0.8})); s.position.copy(m.pos); s.scale.set(5,5,1); s.userData.t=0; s.userData.life=0.35; FX.group.add(s); }
     let hitAst=null; let hitShip=null;
     for(const a of AST.data){ if(!a.alive) continue; const dx=m.pos.x-a.x,dy=m.pos.y-a.y,dz=m.pos.z-a.z,r=a.size*1.15; if(dx*dx+dy*dy+dz*dz<=r*r){ hitAst=a; break; } }
-    if(!hitAst){
-      for(const t of TRAWLERS){ const dx=m.pos.x-t.pos.x,dy=m.pos.y-t.pos.y,dz=m.pos.z-t.pos.z,r=t.radius*1.2; if(dx*dx+dy*dy+dz*dz<=r*r){ hitShip=t; break; } }
-    }
+    if(!hitAst){ for(const t of TRAWLERS){ const dx=m.pos.x-t.pos.x,dy=m.pos.y-t.pos.y,dz=m.pos.z-t.pos.z,r=t.radius*1.2; if(dx*dx+dy*dy+dz*dz<=r*r){ hitShip=t; break; } } }
     if(hitAst){ hitAst.hp-=ship.missile.dmg; if(hitAst.hp<=0) destroyAsteroid(hitAst); spawnExplosion(m.pos,2.4); scene.remove(m.mesh); MISSILES.splice(i,1); }
     else if(hitShip){ hitShip.hp-=ship.missile.dmg*1.4; if(hitShip.hp<=0) destroyTrawler(hitShip); spawnExplosion(m.pos,3.0); scene.remove(m.mesh); MISSILES.splice(i,1); }
     else if(m.life<=0){ scene.remove(m.mesh); MISSILES.splice(i,1); }
   }
 }
 
-/* ---- MISSING IN PREVIOUS DROP: updateDrops(dt) ---- */
+/* ---- Drops update (reused temps; pooled flares) ---- */
+const _mtx=new THREE.Matrix4(), _toShip=new THREE.Vector3();
 function updateDrops(dt){
+  const sx=ship.pos.x, sy=ship.pos.y, sz=ship.pos.z;
   for(let i=0;i<DROPS.count;i++){
     const d=DROPS.data[i]; if(!d||!d.alive) continue;
     d.pos.addScaledVector(d.vel,dt); d.vel.multiplyScalar(0.992);
-    if(d.flare){ d.flare.position.copy(d.pos); d.flare.scale.setScalar(Math.min(32,d.scale*1.8)); }
-    const toShip=ship.pos.clone().sub(d.pos); const dist=toShip.length();
+
+    // update flare sprite if assigned
+    if(d.flareSlot>=0){ const sp=LOOT.pool[d.flareSlot]; sp.position.copy(d.pos); sp.scale.setScalar(Math.min(32,d.scale*1.8)); }
+
+    _toShip.set(sx-d.pos.x, sy-d.pos.y, sz-d.pos.z);
+    const dist=_toShip.length();
     const magnetBase = 30 + (upgrades.magnet-1)*12;
     const range = magnetBase + d.scale*5.0;
-    if(dist<range){ d.vel.add(toShip.normalize().multiplyScalar(((magnetBase*1.4)+d.scale)*dt)); }
+    if(dist<range){ d.vel.add(_toShip.multiplyScalar(((magnetBase*1.4)+d.scale)*dt/dist)); }
     const pickupR = 6 + d.scale*0.6;
     if(dist<pickupR){
       d.alive=false; ship.credits+=d.value; ship.cargo=Math.min(ship.cargoCap,ship.cargo+1); toast('+'+d.value+' cr'); AUD.pickup();
-      const mtx=new THREE.Matrix4().compose(new THREE.Vector3(999999,999999,999999),new THREE.Quaternion(),new THREE.Vector3(0.0001,0.0001,0.0001));
-      DROPS.inst.setMatrixAt(i,mtx); DROPS.inst.instanceMatrix.needsUpdate=true; if(d.flare){ scene.remove(d.flare); d.flare.material.dispose(); }
-      updateUI(); save();
+      if(d.flareSlot>=0){ const pidx=d.flareSlot; const sp=LOOT.pool[pidx]; sp.visible=false; LOOT.assigned.delete(i); LOOT.reverse[pidx]=undefined; d.flareSlot=-1; }
+      _mtx.compose(new THREE.Vector3(999999,999999,999999), new THREE.Quaternion(), new THREE.Vector3(0.0001,0.0001,0.0001));
+      DROPS.inst.setMatrixAt(i,_mtx); DROPS.inst.instanceMatrix.needsUpdate=true; updateUI(); save();
     } else {
-      const mtx=new THREE.Matrix4().compose(d.pos,new THREE.Quaternion(),new THREE.Vector3(d.scale,d.scale,d.scale));
-      DROPS.inst.setMatrixAt(i,mtx); DROPS.inst.instanceMatrix.needsUpdate=true;
+      _mtx.compose(d.pos, new THREE.Quaternion(), new THREE.Vector3(d.scale,d.scale,d.scale));
+      DROPS.inst.setMatrixAt(i,_mtx);
     }
   }
+  DROPS.inst.instanceMatrix.needsUpdate=true;
 }
 
 function updateFX(dt){
@@ -1247,15 +1193,16 @@ function loop(){
     camera.position.copy(ship.pos).add(eye); camera.quaternion.copy(ship.quat);
 
     updateTrawlers(dt);
-    applyCameraShake(dt); updateScreenFX(dt); updateFPS(dt); updateScan(dt); updateStation(dt);
+    applyCameraShake(dt); updateScreenFX(dt); updateScan(dt); updateStation(dt);
 
     shipGroup.position.copy(ship.pos); shipGroup.quaternion.copy(ship.quat);
 
     ship.laser._cd=Math.max(0,ship.laser._cd-dt); ship.laser.heat=Math.max(0,ship.laser.heat-ship.laser.cooldown*dt); if(ship.laser.over&&ship.laser.heat<=35){ ship.laser.over=false; toast('Laser ready'); }
     ship.missile._cd=Math.max(0,ship.missile._cd-dt); ship.missile.heat=Math.max(0,ship.missile.heat-ship.missile.cooldown*dt); if(ship.missile.over&&ship.missile.heat<=35){ ship.missile.over=false; toast('Missiles ready'); }
 
-    updateMissiles(dt); updateDrops(dt); updateFX(dt);
+    updateMissiles(dt); updateDrops(dt); reassignLootFlares(dt); updateFX(dt);
     sun.position.copy(ship.pos).add(new THREE.Vector3(1,0.2,0.3).multiplyScalar(30000));
+    updateFPS(dt); adjustResolution(dt);
   }
 
   updateNavHUD(NAV.currentPos(), dt);
@@ -1273,9 +1220,9 @@ async function buildWorldAsync(s){
   for(const b of LASER_BEAMS){ removeBeam(b); } LASER_BEAMS.length=0;
   for(let i=MISSILES.length-1;i>=0;i--){ scene.remove(MISSILES[i].mesh); } MISSILES.length=0;
   for(let i=FX.group.children.length-1;i>=0;i--){ const n=FX.group.children[i]; FX.group.remove(n); n.geometry?.dispose?.(); n.material?.dispose?.(); }
-  clearFieldFX(); await nextFrame();
+  clearFieldFX(); destroyLootFlares(); await nextFrame();
 
-  Loader.pct(0.10); Loader.sub('Drops & field…'); resetDrops();
+  Loader.pct(0.10); Loader.sub('Drops & field…'); resetDrops(); setupLootFlares();
 
   Loader.pct(0.12); Loader.sub('Populating asteroid fields…'); await buildAsteroidsAsync(s, (msg)=>Loader.sub(msg)); Loader.pct(0.62);
 
@@ -1283,7 +1230,7 @@ async function buildWorldAsync(s){
   skydome = makeSkydome(s ^ 0xDEADBEEF); scene.add(skydome); await nextFrame(); Loader.pct(0.70);
 
   Loader.sub('Seeding stars…'); if(stars) scene.remove(stars);
-  const starCount = (quality==='ultra') ? 22000 : 15000;
+  const starCount = (quality==='ultra') ? 12000 : 8000; // reduced default counts
   stars = await makeStarfieldAsync(s^0x1234, starCount, 70000, (msg)=>Loader.sub(msg));
   scene.add(stars); Loader.pct(0.88);
 
@@ -1307,13 +1254,7 @@ async function buildWorldAsync(s){
 /* ---------- Boot ---------- */
 function onResize(){ renderer.setSize(innerWidth,innerHeight); camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); }
 addEventListener('resize',onResize);
-
-function attachGlobalShortcuts(){
-  document.addEventListener('keydown',(e)=>{
-    if(e.code==='KeyC' && docked){ closeDockPanel(); }
-    if(e.code==='Escape' && ui.optMask.style.display==='flex'){ closeOptions(); }
-  });
-}
+function attachGlobalShortcuts(){ document.addEventListener('keydown',(e)=>{ if(e.code==='KeyC' && docked){ closeDockPanel(); } if(e.code==='Escape' && ui.optMask.style.display==='flex'){ closeOptions(); } }); }
 
 async function init(){
   loadSettings();
