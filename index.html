@@ -90,22 +90,92 @@ app.appendChild(renderer.domElement);
 scene.add(new THREE.AmbientLight(0x222233,0.95));
 const sun=new THREE.DirectionalLight(0xffffff,0.8); sun.position.set(1,0.2,0.3).multiplyScalar(30000); scene.add(sun);
 
-/* ---------- Stars/Planets ---------- */
-function makeStarfield(seed,count,spread=60000){
-  const R=rng(seed), geo=new THREE.BufferGeometry(), pos=new Float32Array(count*3);
-  for(let i=0;i<count;i++){
-    const r=spread*Math.pow(R(),0.25), th=R()*Math.PI*2, ph=Math.acos(2*R()-1);
-    pos[i*3]=r*Math.sin(ph)*Math.cos(th);
-    pos[i*3+1]=r*Math.cos(ph);
-    pos[i*3+2]=r*Math.sin(ph)*Math.sin(th);
+/* ---------- Stars/Planets/Nebula ---------- */
+function makeStarfield(seed, count, spread=90000){
+  const group=new THREE.Group();
+  const R=rng(seed);
+  function layer(n, spr, size){
+    const geo=new THREE.BufferGeometry();
+    const pos=new Float32Array(n*3);
+    for(let i=0;i<n;i++){
+      const r=spr*Math.pow(R(),0.22);
+      const th=R()*Math.PI*2;
+      const u=R()*2-1;
+      const ph=Math.acos(u);
+      const s=Math.sin(ph);
+      pos[i*3]=r*s*Math.cos(th);
+      pos[i*3+1]=r*Math.cos(ph);
+      pos[i*3+2]=r*s*Math.sin(th);
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+    const mat=new THREE.PointsMaterial({
+      size, color:0xffffff, sizeAttenuation:true,
+      transparent:true, opacity:0.9, depthWrite:false
+    });
+    const pts=new THREE.Points(geo,mat);
+    pts.frustumCulled=false;
+    group.add(pts);
   }
-  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
-  return new THREE.Points(geo, new THREE.PointsMaterial({size:2,color:0xffffff}));
+  layer(Math.floor(count*0.7), spread*0.9, 2.0);
+  layer(Math.floor(count*0.9), spread*1.8, 1.4);
+  layer(Math.floor(count*0.8), spread*2.6, 1.0);
+  group.frustumCulled=false;
+  return group;
 }
-function makePlanet(radius,dist,colorHex){
+function makePlanet(radius,dist,colorHex,withRing=false){
+  const group=new THREE.Group();
+
   const g=new THREE.SphereGeometry(radius,32,16);
-  const m=new THREE.MeshStandardMaterial({color:colorHex,roughness:0.9,metalness:0.0});
-  const s=new THREE.Mesh(g,m); s.position.set(dist*0.8,dist*0.2,-dist); return s;
+  const m=new THREE.MeshStandardMaterial({color:colorHex,roughness:0.95,metalness:0.0});
+  const sphere=new THREE.Mesh(g,m);
+  group.add(sphere);
+
+  const halo=new THREE.Sprite(new THREE.SpriteMaterial({
+    map: makeGlowTexture(256,0.0,0.65,'rgba(120,180,255,1)'),
+    transparent:true, blending:THREE.AdditiveBlending,
+    depthWrite:false, opacity:0.35
+  }));
+  halo.scale.set(radius*4.5, radius*4.5, 1);
+  group.add(halo);
+
+  if(withRing){
+    const rg=new THREE.RingGeometry(radius*1.35, radius*2.0, 64);
+    const rm=new THREE.MeshBasicMaterial({
+      color:0xbad4ff, transparent:true, opacity:0.18,
+      side:THREE.DoubleSide, depthWrite:false
+    });
+    const ring=new THREE.Mesh(rg,rm);
+    ring.rotation.x = Math.PI*0.44;
+    ring.rotation.z = Math.PI*0.18;
+    group.add(ring);
+  }
+
+  group.position.set(dist*0.8,dist*0.2,-dist);
+  group.frustumCulled=false;
+  return group;
+}
+function makeNebulae(seed){
+  const R=rng(seed);
+  const group=new THREE.Group();
+  const colors=[
+    'rgba(120,160,255,1)',
+    'rgba(180,120,255,1)',
+    'rgba(255,160,120,1)'
+  ];
+  for(let i=0;i<3;i++){
+    const tex=makeGlowTexture(512,0.0,1.0,colors[i%colors.length]);
+    const spr=new THREE.Sprite(new THREE.SpriteMaterial({
+      map:tex, transparent:true, blending:THREE.AdditiveBlending,
+      depthWrite:false, opacity:0.28+R()*0.18
+    }));
+    const dist=130000+R()*90000;
+    spr.position.set(dist*(R()*1.6-0.3), dist*(R()*0.7-0.35), -dist);
+    const size=dist*(0.9+R()*0.6);
+    spr.scale.set(size,size,1);
+    group.add(spr);
+  }
+  group.frustumCulled=false;
+  return group;
 }
 
 /* ---------- DOM/UI ---------- */
@@ -143,9 +213,11 @@ ui.shop.style.display='block';
 /* ---------- Ship ---------- */
 const ship={
   pos:new THREE.Vector3(), vel:new THREE.Vector3(), quat:new THREE.Quaternion(),
-  thrust:36, strafe:28, lift:28,
+  thrust:48, strafe:36, lift:36,            // (was 36/28/28)
   yawRate:rad(100), pitchRate:rad(100), rollRate:rad(180),
-  dampingLin:0.06, maxSpeed:280, range:3800,
+  dampingLin:0.08,                          // (was 0.06)
+  maxSpeed:300,                             // (was 280)
+  range:3800,
   cargo:0, cargoCap:100, credits:0,
   laser:{ canFire:true, heat:0, over:false, cooldown:30, shotHeat:18, dmg:50, rof:10, _cd:0 },
   missile:{ canFire:true, heat:0, over:false, cooldown:18, shotHeat:34, dmg:240, reload:0.7, _cd:0 }
@@ -176,7 +248,7 @@ const AST={ inst:[], data:[], count:0, geo:[], mat:null };
 const DROPS={ inst:null, data:[], count:0, cap:0, geo:null, mat:null };
 const MISSILES=[];   // projectiles
 const LASER_BEAMS=[];// beam visuals
-let stars, planetA, planetB;
+let stars, planetA, planetB, planetC, planetD, nebulae;
 
 const RES_KINDS=[{name:'Iron',val:8,color:0xa0a8b8},{name:'Nickel',val:10,color:0x9fb7aa},{name:'Silver',val:14,color:0xc0c0ff},{name:'Gold',val:22,color:0xffd54a},{name:'Platinum',val:30,color:0xd9d9ff},{name:'Iridium',val:40,color:0xa3d1ff}];
 const lootColorForSize = sz => (sz>18?0xffd54a:sz>12?0xd9d9ff:sz>8?0xc0c0ff:0xa0a8b8);
@@ -210,7 +282,15 @@ function buildAsteroids(seed){
 function resetDrops(){
   if(DROPS.inst){ scene.remove(DROPS.inst); DROPS.inst.geometry.dispose(); DROPS.inst.material.dispose(); }
   DROPS.count=0; DROPS.data=[]; DROPS.geo=new THREE.OctahedronGeometry(1,0);
-  DROPS.mat=new THREE.MeshBasicMaterial({vertexColors:true}); // unlit → omni-glow
+  // Unlit + omni-glow: additive, double-sided, no depth write
+  DROPS.mat = new THREE.MeshBasicMaterial({
+    vertexColors:true,
+    transparent:true,
+    opacity:0.95,
+    blending:THREE.AdditiveBlending,
+    side:THREE.DoubleSide,
+    depthWrite:false
+  });
   DROPS.cap=(quality==='ultra'?3500:2000);
   DROPS.inst=new THREE.InstancedMesh(DROPS.geo,DROPS.mat,DROPS.cap);
   DROPS.inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -224,7 +304,11 @@ const glowTexLoot=makeGlowTexture(128,0.0,0.55,'rgba(255,240,140,1)');
 function spawnDrop(pos,value,color,scale=1.4){
   if(DROPS.count>=DROPS.cap) return;
   const id=DROPS.count++, vel=new THREE.Vector3((Math.random()-0.5)*3,(Math.random()-0.5)*3,(Math.random()-0.5)*3);
-  const flare=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexLoot,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.9}));
+  const flare=new THREE.Sprite(new THREE.SpriteMaterial({
+    map:glowTexLoot,transparent:true,blending:THREE.AdditiveBlending,
+    depthWrite:false, depthTest:false, opacity:0.9
+  }));
+  flare.renderOrder = 5;
   flare.position.copy(pos); flare.scale.setScalar(Math.min(32,scale*1.8)); scene.add(flare);
   DROPS.data[id]={pos:pos.clone(),vel,value,alive:true,color,scale,flare};
   const m=new THREE.Matrix4(); m.compose(DROPS.data[id].pos,new THREE.Quaternion(),new THREE.Vector3(scale,scale,scale));
@@ -282,8 +366,11 @@ function updateBeam(b,dt){
 }
 function removeBeam(b){
   scene.remove(b.mesh,b.outer,b.startGlow,b.endGlow);
-  b.mesh.geometry.dispose(); b.mesh.material.dispose(); b.outer.geometry.dispose(); b.outer.material.dispose();
-  b.startGlow.material.map.dispose(); b.startGlow.material.dispose(); b.endGlow.material.map.dispose(); b.endGlow.material.dispose();
+  b.mesh.geometry.dispose(); b.mesh.material.dispose();
+  b.outer.geometry.dispose(); b.outer.material.dispose();
+  // Do NOT dispose shared sprite maps (glowTexBlue). Just dispose materials.
+  b.startGlow.material.dispose();
+  b.endGlow.material.dispose();
 }
 
 function spawnMissile(dir){
@@ -328,10 +415,28 @@ function buildWorld(s){
   for(let i=MISSILES.length-1;i>=0;i--){ scene.remove(MISSILES[i].mesh); } MISSILES.length=0;
   for(let i=FX.group.children.length-1;i>=0;i--){ const n=FX.group.children[i]; FX.group.remove(n); n.geometry?.dispose?.(); n.material?.dispose?.(); }
   resetDrops(); buildAsteroids(s);
-  if(stars) scene.remove(stars); stars=makeStarfield(s^0x1234,6000,60000); scene.add(stars);
-  if(planetA) scene.remove(planetA); if(planetB) scene.remove(planetB);
-  planetA=makePlanet(4200,70000,0x1f2a7a); scene.add(planetA);
-  planetB=makePlanet(2600,110000,0x7a3f1f); scene.add(planetB);
+
+  // --- Stars + Nebulae ---
+  if(stars) scene.remove(stars);
+  const starCount = (quality==='ultra') ? 24000 : 14000;
+  stars = makeStarfield(s^0x1234, starCount, 90000);
+  scene.add(stars);
+
+  if(nebulae) scene.remove(nebulae);
+  nebulae = makeNebulae(s^0x1010FACE);
+  scene.add(nebulae);
+
+  // --- Planets (two originals + two farther) ---
+  if(planetA) scene.remove(planetA);
+  if(planetB) scene.remove(planetB);
+  if(planetC) scene.remove(planetC);
+  if(planetD) scene.remove(planetD);
+
+  planetA = makePlanet(4200,  70000,  0x1f2a7a, false); scene.add(planetA);
+  planetB = makePlanet(2600, 110000,  0x7a3f1f, true ); scene.add(planetB); // ringed
+  planetC = makePlanet(5200, 180000,  0x263a96, true ); scene.add(planetC);
+  planetD = makePlanet(3500, 220000,  0x8c3b1d, false); scene.add(planetD);
+
   ship.pos.set(0,0,0); ship.vel.set(0,0,0); ship.quat.identity();
   ship.laser.heat=0; ship.laser.over=false; ship.laser._cd=0; ship.missile.heat=0; ship.missile.over=false; ship.missile._cd=0;
   ui.seed.textContent=s; ui.cap.textContent=ship.cargoCap; updateUI();
@@ -344,7 +449,11 @@ function load(){ try{ const j=localStorage.getItem(LSKEY); if(!j) return; const 
   if(d.seed) seed=d.seed; if(d.quality) quality=d.quality; if(d.credits!=null) ship.credits=d.credits; if(d.cargo!=null) ship.cargo=d.cargo; if(d.upgrades) Object.assign(upgrades,d.upgrades);
   ship.laser.dmg=50+(upgrades.laserD-1)*18; ship.laser.cooldown=30+(upgrades.laserC-1)*6; ship.laser.shotHeat=Math.max(8,18-(upgrades.laserC-1)*2);
   ship.missile.dmg=240+(upgrades.missD-1)*80;
-  ship.thrust=36+(upgrades.thrust-1)*6; ship.strafe=28+(upgrades.thrust-1)*5; ship.lift=28+(upgrades.thrust-1)*5; ship.maxSpeed=280+(upgrades.thrust-1)*20;
+  // Updated baselines & scaling for punchier feel
+  ship.thrust = 48 + (upgrades.thrust-1)*7;
+  ship.strafe = 36 + (upgrades.thrust-1)*6;
+  ship.lift   = 36 + (upgrades.thrust-1)*6;
+  ship.maxSpeed = 300 + (upgrades.thrust-1)*24;
   ship.yawRate=rad(100+(upgrades.turn-1)*10); ship.pitchRate=rad(100+(upgrades.turn-1)*10); ship.rollRate=rad(180+(upgrades.turn-1)*18);
   ship.cargoCap=100+(upgrades.magnet-1)*50; }catch(e){ console.warn('save load failed',e); } }
 
@@ -411,7 +520,7 @@ function updateDrops(dt){
     const pickupR = 6 + d.scale*0.6; if(dist<pickupR){
       d.alive=false; ship.credits+=d.value; ship.cargo=Math.min(ship.cargoCap,ship.cargo+1); toast('+'+d.value+' cr');
       const mtx=new THREE.Matrix4(); mtx.compose(new THREE.Vector3(999999,999999,999999),new THREE.Quaternion(),new THREE.Vector3(0.0001,0.0001,0.0001));
-      DROPS.inst.setMatrixAt(i,mtx); DROPS.inst.instanceMatrix.needsUpdate=true; if(d.flare){ scene.remove(d.flare); d.flare.material.map.dispose(); d.flare.material.dispose(); }
+      DROPS.inst.setMatrixAt(i,mtx); DROPS.inst.instanceMatrix.needsUpdate=true; if(d.flare){ scene.remove(d.flare); d.flare.material.dispose(); }
       updateUI(); save();
     } else {
       const mtx=new THREE.Matrix4(); mtx.compose(d.pos,new THREE.Quaternion(),new THREE.Vector3(d.scale,d.scale,d.scale));
@@ -424,7 +533,12 @@ function updateFX(dt){
     const s=FX.group.children[i]; s.userData.t=(s.userData.t||0)+dt; const t=s.userData.t/(s.userData.life||0.35);
     if(s.isSprite){ s.material.opacity=0.8*(1-t); s.scale.setScalar(THREE.MathUtils.lerp(5,2.2,t)); }
     else { s.scale.setScalar(THREE.MathUtils.lerp(0.5,s.userData.scale||1,t)); s.material.opacity=0.9*(1-t); }
-    if(t>=1){ FX.group.remove(s); s.material.map?.dispose?.(); s.material.dispose(); s.geometry?.dispose?.(); }
+    if(t>=1){
+      FX.group.remove(s);
+      // Do NOT dispose shared maps (glowTexOrange/glowTexBlue). Only materials/geometry as applicable.
+      s.material?.dispose?.();
+      s.geometry?.dispose?.();
+    }
   }
   for(let i=LASER_BEAMS.length-1;i>=0;i--){ const b=LASER_BEAMS[i]; updateBeam(b,dt); if(b.t>=b.life){ removeBeam(b); LASER_BEAMS.splice(i,1); } }
 }
