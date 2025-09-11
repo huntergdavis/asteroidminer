@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>AstroMiner — Optional Mouse Aim (LMB/RMB) • Clear Start • Fewer Crystals</title>
+<title>AstroMiner — Mouse Aim + Wheel Throttle + MMB Barrel Roll</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   :root{
@@ -71,7 +71,7 @@
   .statBox{background:#0b1220;border:1px solid #1b2a46;border-radius:8px;padding:6px}
 
   /* Mouse hint */
-  .hint{position:absolute;left:50%;top:50%;transform:translate(-50%,-70px);background:rgba(0,0,0,.5);padding:8px 10px;border-radius:10px;font-size:12px;z-index:6;pointer-events:none}
+  .hint{position:absolute;left:50%;top:50%;transform:translate(-50%,-70px);background:rgba(0,0,0,.5);padding:8px 10px;border-radius:10px;font-size:12px;z-index:6;pointer-events:none;text-align:center}
   .hint.hide{display:none}
 </style>
 </head>
@@ -80,7 +80,7 @@
 
 <div class="hud">
   <div><b>Seed:</b> <span id="uiSeed">0</span> · <b>Quality:</b> <span id="uiQual">High</span></div>
-  <div style="margin-top:6px"><b>Speed:</b> <span id="uiSpd">0</span> m/s · <b>Range:</b> <span id="uiRange">0</span> m</div>
+  <div style="margin-top:6px"><b>Speed:</b> <span id="uiSpd">0</span> m/s · <b>Thrust:</b> <span id="uiThrust">0</span>% · <b>Range:</b> <span id="uiRange">0</span> m</div>
   <div style="margin-top:6px"><b>Boost</b><div class="bar"><span id="barBoost"></span></div></div>
   <div style="margin-top:6px"><b>Laser Heat</b><div class="bar"><span id="barLaser"></span></div></div>
   <div style="margin-top:6px"><b>Missile Heat</b><div class="bar red"><span id="barMiss"></span></div></div>
@@ -117,10 +117,10 @@
 
 <div class="help">
   <div><b>Controls</b> — Zero‑G 6‑DOF</div>
-  <div>Pitch: <b>W/S</b> · Yaw: <b>A/D</b> · Roll: <b>Q/E</b></div>
-  <div>Forward/Reverse: <b>↑/↓</b> · Strafe: <b>←/→</b> · Lift: <b>R/F</b> · Boost: <b>Shift</b></div>
+  <div>Pitch: <b>W/S</b> · Yaw: <b>A/D</b> · Roll: <b>Q/E</b> (or <b>Hold MMB</b> + move mouse left/right)</div>
+  <div>Forward/Reverse: <b>↑/↓</b> or <b>Mouse Wheel</b> · Strafe: <b>←/→</b> · Lift: <b>R/F</b> · Boost: <b>Shift</b></div>
   <div>Brake/Damp: <b>Z</b> · Laser: <b>Space</b>/<b>LMB</b> · Missile: <b>X</b>/<b>RMB</b> · Dock: <b>C</b> · Options: <b>O</b>/<b>Esc</b> · <b>Cycle Nav: H</b></div>
-  <div>Mouse Aim (optional): <b>Click the playfield</b> to capture pointer · LMB fire laser · RMB fire missile · Press <b>Esc</b> to release.</div>
+  <div>Mouse Aim: <b>Click the playfield</b> to capture. <b>LMB</b>=Laser · <b>RMB</b>=Missile · <b>Wheel</b>=Throttle ± · <b>Hold MMB</b>=Barrel Roll · <b>Esc</b> to release.</div>
 </div>
 
 <!-- Reticle -->
@@ -178,7 +178,7 @@
 </div>
 
 <!-- Mouse hint -->
-<div class="hint" id="mouseHint">Click the playfield to use <b>Mouse Aim</b> — LMB: Laser · RMB: Missile · Esc: Release</div>
+<div class="hint" id="mouseHint">Click to enable <b>Mouse Aim</b> · LMB: Laser · RMB: Missile · Wheel: Throttle ± · Hold MMB: Barrel Roll · Esc: Release</div>
 
 <script type="module">
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
@@ -208,7 +208,7 @@ const sun=new THREE.DirectionalLight(0xffffff,0.8); sun.position.set(1,0.2,0.3).
 const byId = id=>document.getElementById(id);
 const ui={
   seed:byId('uiSeed'), qual:byId('uiQual'),
-  spd:byId('uiSpd'), range:byId('uiRange'),
+  spd:byId('uiSpd'), range:byId('uiRange'), thrustPct:byId('uiThrust'),
   barBoost:byId('barBoost'), barLaser:byId('barLaser'), barMiss:byId('barMiss'),
   credits:byId('uiCredits'), cargo:byId('uiCargo'), cap:byId('uiCap'),
   toast:byId('toast'), err:byId('err'),
@@ -349,8 +349,13 @@ const HP_LOCAL = { laserL:new THREE.Vector3(-0.9,0.55,-1.6), laserR:new THREE.Ve
 const eyeLocal = new THREE.Vector3(0,0,0);
 function hardpointWorld(local){ return local.clone().applyQuaternion(ship.quat).add(ship.pos); }
 
-/* ---------- Mouse aim (optional) ---------- */
-const MOUSE={yaw:0,pitch:0,fireL:false,fireR:false,sens:0.0022,locked:false};
+/* ---------- Mouse aim + Wheel throttle + MMB roll ---------- */
+const MOUSE={
+  yaw:0,pitch:0,roll:0,
+  fireL:false,fireR:false,mmb:false,locked:false,
+  sens:0.0022, sensRoll:0.0032,
+  throttle:0 // persistent forward/reverse thrust [-1..1]
+};
 function updateMouseHint(){ ui.mouseHint.classList.toggle('hide', !Settings.mouseAim || MOUSE.locked || paused); }
 renderer.domElement.addEventListener('contextmenu',e=>{ e.preventDefault(); });
 renderer.domElement.addEventListener('click',()=>{
@@ -360,26 +365,51 @@ renderer.domElement.addEventListener('click',()=>{
 document.addEventListener('pointerlockchange',()=>{
   MOUSE.locked = (document.pointerLockElement===renderer.domElement);
   renderer.domElement.style.cursor = MOUSE.locked?'none':'auto';
-  if(MOUSE.locked){ toast('Mouse Aim Engaged'); } else { MOUSE.fireL=false; MOUSE.fireR=false; }
+  if(MOUSE.locked){ toast('Mouse Aim Engaged'); } else { MOUSE.fireL=false; MOUSE.fireR=false; MOUSE.mmb=false; }
   updateMouseHint();
 });
 renderer.domElement.addEventListener('mousemove',(e)=>{
   if(!Settings.mouseAim || !MOUSE.locked) return;
-  MOUSE.yaw   += (-e.movementX) * MOUSE.sens; // move right → yaw right
-  MOUSE.pitch += (-e.movementY) * MOUSE.sens; // move up   → pitch up
+  const dx = -e.movementX, dy = -e.movementY;
+  if(MOUSE.mmb){
+    // Barrel roll with horizontal movement; keep vertical for pitching
+    MOUSE.roll  += dx * MOUSE.sensRoll;
+    MOUSE.pitch += dy * MOUSE.sens;
+  }else{
+    MOUSE.yaw   += dx * MOUSE.sens;
+    MOUSE.pitch += dy * MOUSE.sens;
+  }
 });
 function onMouseDown(e){
   if(!Settings.mouseAim) return;
   if(e.button===0){ MOUSE.fireL=true; }
   if(e.button===2){ MOUSE.fireR=true; }
+  if(e.button===1){ e.preventDefault(); MOUSE.mmb=true; }
 }
 function onMouseUp(e){
   if(e.button===0){ MOUSE.fireL=false; }
   if(e.button===2){ MOUSE.fireR=false; }
+  if(e.button===1){ MOUSE.mmb=false; }
 }
 renderer.domElement.addEventListener('mousedown', onMouseDown);
 document.addEventListener('mouseup', onMouseUp);
-window.addEventListener('blur',()=>{ MOUSE.fireL=false; MOUSE.fireR=false; });
+window.addEventListener('blur',()=>{ MOUSE.fireL=false; MOUSE.fireR=false; MOUSE.mmb=false; });
+
+// Wheel = throttle forward/reverse
+function onWheel(e){
+  // Only when interacting with the playfield
+  if(e.target!==renderer.domElement) return;
+  e.preventDefault();
+  if(paused) return;
+  // Normalize deltas across devices
+  const raw = (e.deltaMode===1 ? e.deltaY*16 : e.deltaMode===2 ? e.deltaY*800 : e.deltaY);
+  // Scroll up = forward, down = reverse
+  const step = clamp(-raw/800, -0.25, 0.25); // gentle, but responsive
+  MOUSE.throttle = clamp(MOUSE.throttle + step, -1, 1);
+  // Small on-screen nudge
+  ui.thrustPct.textContent = Math.round(MOUSE.throttle*100);
+}
+renderer.domElement.addEventListener('wheel', onWheel, {passive:false});
 
 /* ---------- Upgrades & Shop ---------- */
 const upgrades={
@@ -906,6 +936,7 @@ function updateUI(){
   ui.credits.textContent=ship.credits|0;
   ui.cargo.textContent=ship.cargo|0;
   ui.cap.textContent=ship.cargoCap|0;
+  ui.thrustPct.textContent = Math.round(MOUSE.throttle*100);
   ui.barLaser.style.width=clamp(ship.laser.heat,0,100)+'%';
   ui.barMiss.style.width =clamp(ship.missile.heat,0,100)+'%';
   ui.barBoost.style.width = clamp((ship.boost.val/ship.boost.cap)*100,0,100)+'%';
@@ -1009,13 +1040,14 @@ function handleInput(dt){
   // Keyboard yaw/pitch/roll
   let yaw=((keys['KeyA']?1:0)-(keys['KeyD']?1:0))*ship.yawRate*dt;
   let pitch=((keys['KeyW']?1:0)-(keys['KeyS']?1:0))*ship.pitchRate*dt;
-  const roll=((keys['KeyQ']?1:0)-(keys['KeyE']?1:0))*ship.rollRate*dt;
+  let roll=((keys['KeyQ']?1:0)-(keys['KeyE']?1:0))*ship.rollRate*dt;
 
-  // Mouse contributions (already in radians)
+  // Mouse contributions (radians already)
   if(Settings.mouseAim && MOUSE.locked){
-    yaw   += MOUSE.yaw;   // right movement → negative radians already applied above
-    pitch += MOUSE.pitch; // up movement → positive radians
-    MOUSE.yaw=0; MOUSE.pitch=0;
+    // When MMB is held we use horizontal movement to roll instead of yaw
+    if(MOUSE.mmb){ roll += MOUSE.roll; } else { yaw += MOUSE.yaw; }
+    pitch += MOUSE.pitch;
+    MOUSE.yaw=0; MOUSE.pitch=0; MOUSE.roll=0;
   }
 
   const qYaw=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),yaw);
@@ -1027,7 +1059,11 @@ function handleInput(dt){
   const up =new THREE.Vector3(0,1,0).applyQuaternion(ship.quat);
   const right=new THREE.Vector3(1,0,0).applyQuaternion(ship.quat);
 
-  const thrustF=(keys['ArrowUp']?1:0)-(keys['ArrowDown']?1:0);
+  // Wheel throttle + keys
+  const throttle = MOUSE.throttle; // [-1..1]
+  const thrustFKeys=(keys['ArrowUp']?1:0)-(keys['ArrowDown']?1:0);
+  const forwardInput = clamp(throttle + thrustFKeys, -1, 1);
+
   const thrustX=(keys['ArrowRight']?1:0)-(keys['ArrowLeft']?1:0);
   const thrustY=(keys['KeyR']?1:0)-(keys['KeyF']?1:0);
 
@@ -1036,7 +1072,7 @@ function handleInput(dt){
   if(boosting){ ship.boost.val = Math.max(0, ship.boost.val - dt); triggerKick(0.3); }
   else { ship.boost.val = Math.min(ship.boost.cap, ship.boost.val + ship.boost.regen*dt); }
 
-  ship.vel.addScaledVector(fwd,thrustF*ship.thrust*mult*dt);
+  ship.vel.addScaledVector(fwd,forwardInput*ship.thrust*mult*dt);
   ship.vel.addScaledVector(right,thrustX*ship.strafe*mult*dt);
   ship.vel.addScaledVector(up,thrustY*ship.lift*mult*dt);
 
@@ -1152,6 +1188,7 @@ async function buildWorldAsync(s){
 
   ship.laser.heat=0; ship.laser.over=false; ship.laser._cd=0; ship.missile.heat=0; ship.missile.over=false; ship.missile._cd=0;
   ship.boost.val = ship.boost.cap;
+  MOUSE.throttle = 0; // neutral throttle at spawn
 
   NAV.targetIdx = 0; ui.navName.textContent = NAV.currentName();
 
