@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>AstroMiner — Clear Start • Fewer Crystals • New Upgrades</title>
+<title>AstroMiner — Clear Start • Fewer Crystals • No Auto‑Level</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   :root{
@@ -107,7 +107,7 @@
   <div class="row"><span class="k">Mass Driver</span><button id="unlockMass">Locked (900)</button></div>
   <div class="row"><span class="k">Gravity Gun</span><button id="unlockGrav">Locked (1500)</button></div>
   <div style="margin-top:6px;opacity:.75">
-    Shop: <b>U</b> · Quality: <b>1</b>/<b>2</b> · New Seed: <b>N</b> · Auto‑Level: <b>L</b> · Boost: <b>Shift</b> · FPS: <b>Shift+F</b> · Cycle Nav: <b>H</b>
+    Shop: <b>U</b> · Quality: <b>1</b>/<b>2</b> · New Seed: <b>N</b> · Boost: <b>Shift</b> · FPS: <b>Shift+F</b> · Cycle Nav: <b>H</b>
   </div>
 </div>
 
@@ -136,7 +136,6 @@
     <h3>Options</h3>
     <div class="grid">
       <div>Sound FX</div><div><button class="btn sec" id="optSfx">—</button></div>
-      <div>Auto‑Level on</div><div><button class="btn sec" id="optAL">—</button></div>
       <div>Quality</div><div><button class="btn sec" id="optQual">—</button></div>
       <div>FOV</div><div><button class="btn sec" id="optFovDown">−</button> <span id="optFovVal" class="muted">75</span> <button class="btn sec" id="optFovUp">+</button></div>
     </div>
@@ -212,7 +211,6 @@ const ui={
   lvRof:byId('lvRof'), costRof:byId('costRof'),
   lvBoost:byId('lvBoost'), costBoost:byId('costBoost'),
   lvScan:byId('lvScan'), costScan:byId('costScan'),
-  // New
   lvMissC:byId('lvMissC'), costMissC:byId('costMissC'),
   lvBrake:byId('lvBrake'), costBrake:byId('costBrake'),
   lvTarget:byId('lvTarget'), costTarget:byId('costTarget'),
@@ -225,7 +223,7 @@ const ui={
   loading:byId('loading'), loadText:byId('loadText'), loadSub:byId('loadSub'), loadBar:byId('loadBar'),
   optMask:byId('optMask'), dockMask:byId('dockMask'),
   dsCredits:byId('dsCredits'), dsCargo:byId('dsCargo'), dsSpeed:byId('dsSpeed'),
-  optSfx:byId('optSfx'), optAL:byId('optAL'), optQual:byId('optQual'),
+  optSfx:byId('optSfx'), optQual:byId('optQual'),
   optFovDown:byId('optFovDown'), optFovUp:byId('optFovUp'), optFovVal:byId('optFovVal'),
   buttons:{
     buyLaserD:byId('buyLaserD'), buyLaserC:byId('buyLaserC'), buyMissD:byId('buyMissD'),
@@ -233,7 +231,6 @@ const ui={
     buyRange:byId('buyRange'), buyHold:byId('buyHold'), buyYield:byId('buyYield'),
     buyRof:byId('buyRof'), buyBoost:byId('buyBoost'), buyScan:byId('buyScan'),
     unlockLightning:byId('unlockLightning'), unlockMass:byId('unlockMass'), unlockGrav:byId('unlockGrav'),
-    // New
     buyMissC:byId('buyMissC'), buyBrake:byId('buyBrake'), buyTarget:byId('buyTarget')
   }
 };
@@ -250,7 +247,7 @@ const Loader={
   hide(){ ui.loading.style.display='none'; }
 };
 
-/* ---------- Input & Pause/menus ---------- */
+/* ---------- Input & Menus ---------- */
 const keys={};
 let fpsOn=false, paused=false, pauseReason=null;
 function setPaused(p, reason=null){
@@ -267,7 +264,6 @@ addEventListener('keydown',e=>{
   if(e.code==='Digit2') setQuality('ultra');
   if(e.code==='KeyN')  newSeed();
   if(e.code==='KeyU'){ ui.shop.style.display = (ui.shop.style.display==='none'?'block':'none'); }
-  if(e.code==='KeyL')  { autoLevel=!autoLevel; toast('Auto-Level: '+(autoLevel?'ON':'OFF')); updateOptionsMirror(); }
   if(e.code==='KeyO' || e.code==='Escape'){ openOptions(); }
   if(e.code==='KeyH'){ NAV.nextTarget(); }
 
@@ -277,7 +273,7 @@ addEventListener('keydown',e=>{
 addEventListener('keyup',e=>{ keys[e.code]=false; });
 
 /* ---------- Audio with toggle ---------- */
-const Settings = { sfx:true, autoLevel:true, fov:75, quality:'high' };
+const Settings = { sfx:true, fov:75, quality:'high' };
 function loadSettings(){ try{ const j=localStorage.getItem('astrominer_settings'); if(j){ Object.assign(Settings, JSON.parse(j)); } }catch{} }
 function saveSettings(){ localStorage.setItem('astrominer_settings', JSON.stringify(Settings)); }
 
@@ -306,14 +302,12 @@ const AUD={
 /* ---------- Options modal ---------- */
 function updateOptionsMirror(){
   ui.optSfx.textContent = Settings.sfx?'On':'Off';
-  ui.optAL.textContent  = autoLevel?'On':'Off';
   ui.optQual.textContent= (quality==='ultra')?'Ultra':'High';
   ui.optFovVal.textContent = String(baseFov);
 }
 function openOptions(){ setPaused(true,'options'); ui.optMask.style.display='flex'; updateOptionsMirror(); }
 function closeOptions(){ ui.optMask.style.display='none'; if(pauseReason==='options'){ setPaused(false,null); if(fpsOn) ui.fps.style.display='block'; } }
 ui.optSfx.addEventListener('click',()=>{ Settings.sfx=!Settings.sfx; saveSettings(); updateOptionsMirror(); toast('SFX '+(Settings.sfx?'On':'Off')); });
-ui.optAL.addEventListener('click',()=>{ autoLevel=!autoLevel; Settings.autoLevel=autoLevel; saveSettings(); updateOptionsMirror(); });
 ui.optQual.addEventListener('click',()=>{ setQuality(quality==='ultra'?'high':'ultra'); updateOptionsMirror(); });
 ui.optFovDown.addEventListener('click',()=>{ baseFov=clamp(baseFov-2,60,95); Settings.fov=baseFov; camera.fov=baseFov; camera.updateProjectionMatrix(); saveSettings(); updateOptionsMirror(); });
 ui.optFovUp.addEventListener('click',()=>{ baseFov=clamp(baseFov+2,60,95); Settings.fov=baseFov; camera.fov=baseFov; camera.updateProjectionMatrix(); saveSettings(); updateOptionsMirror(); });
@@ -330,10 +324,9 @@ const ship={
   laser:{ canFire:true, heat:0, over:false, cooldown:30, shotHeat:18, dmg:50, rof:10, _cd:0 },
   missile:{ canFire:true, heat:0, over:false, cooldown:18, shotHeat:34, dmg:240, reload:0.7, _cd:0 },
   boost:{ cap:2.0, regen:0.55, val:2.0, mult:2.1 },
-  brakeCoeff:0.90, // upgraded by Dampers
+  brakeCoeff:0.90,  // upgraded by Dampers
   seekStrength:0.02 // upgraded by Targeting Computer
 };
-let autoLevel=true;
 let baseFov=75, fovKick=0, flashAmt=0, shakeT=0, shakeAmp=0;
 
 const shipGroup=new THREE.Group(); scene.add(shipGroup); shipGroup.visible=false;
@@ -393,7 +386,6 @@ function refreshShop(){
   const C=ui.buttons, cVals={}, set=(k)=>cVals[k]=levelCost(baseCosts[k], upgrades[k]+1);
   ['laserD','laserC','rof','missD','missC','thrust','turn','brake','magnet','range','hold','yield','boost','scan','target'].forEach(set);
 
-  // Levels
   const setLv=(id,val)=>{ byId(id).textContent=val; };
   setLv('lvLaserD',upgrades.laserD); setLv('lvLaserC',upgrades.laserC); setLv('lvRof',upgrades.rof);
   setLv('lvMissD',upgrades.missD); setLv('lvMissC',upgrades.missC);
@@ -401,7 +393,6 @@ function refreshShop(){
   setLv('lvMag',upgrades.magnet); setLv('lvRange',upgrades.range); setLv('lvHold',upgrades.hold);
   setLv('lvYield',upgrades.yield); setLv('lvBoost',upgrades.boost); setLv('lvScan',upgrades.scan); setLv('lvTarget',upgrades.target);
 
-  // Costs
   ui.costLaserD.textContent=cVals.laserD; ui.costLaserC.textContent=cVals.laserC; ui.costRof.textContent=cVals.rof;
   ui.costMissD.textContent=cVals.missD; ui.costMissC.textContent=cVals.missC;
   ui.costThrust.textContent=cVals.thrust; ui.costTurn.textContent=cVals.turn; ui.costBrake.textContent=cVals.brake;
@@ -512,7 +503,6 @@ function buildFieldFX(startCenter,clearR){
     for(let i=0;i<2;i++){
       const s=new THREE.Sprite(new THREE.SpriteMaterial({map:dustTex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.18}));
       let pos;
-      // keep dust outside the starter bubble if in field 0
       let tries=0;
       do{
         pos=f.center.clone().add(new THREE.Vector3((Math.random()-0.5)*400,(Math.random()-0.5)*150,(Math.random()-0.5)*400));
@@ -569,15 +559,17 @@ async function buildAsteroidsAsync(seed, progress){
   const basePerField = (quality==='ultra')?850:650;
   const baseCount = basePerField * fields;
 
-  // Rebalanced: fewer crystals (you asked!), metals still rare
-  const frac = { rock:0.82, crystal:0.12, metal:0.05, giants:0.01 };
+  // MUCH fewer crystals; metals rare; rocks dominant
+  const frac = { rock:0.90, crystal:0.06, metal:0.03, giants:0.01 };
   const counts={ rock:Math.floor(baseCount*frac.rock), crystal:Math.floor(baseCount*frac.crystal), metal:Math.floor(baseCount*frac.metal), giants:Math.floor(baseCount*frac.giants) };
-  const extraCluster = Math.floor(baseCount*0.08);
+  const extraCluster = Math.floor(baseCount*0.08); // rock-only clusters
 
   // Field centers: one at origin (start field), others on ring
   const ringR = (quality==='ultra')?8000:6500;
+
+  // Carve a LARGE safe bubble at start so you have turning room
   const START_CENTER = new THREE.Vector3(0,0,0);
-  const START_CLEAR_R = 420; // carve out a safe bubble for turning
+  const START_CLEAR_R = 1500; // <<< big empty bubble around spawn
 
   FIELDS.push({center:START_CENTER.clone()});
   for(let i=1;i<fields;i++){
@@ -611,20 +603,20 @@ async function buildAsteroidsAsync(seed, progress){
   const beltR=2200,beltW=1000,beltH=700;
   function posInField(fIdx, clustered=false){
     const center=FIELDS[fIdx].center;
-    let P;
-    let tries=0;
-    do{
-      if(clustered){
-        const rad=160+R()*260; const dir=new THREE.Vector3(R()*2-1,R()*2-1,R()*2-1).normalize(); const d=rad*Math.pow(R(),0.7);
-        P = center.clone().addScaledVector(dir,d);
-      }else{
-        const a=R()*Math.PI*2, r=beltR+(R()*2-1)*beltW, x=Math.cos(a)*r, z=Math.sin(a)*r, y=(R()*2-1)*beltH;
-        P = center.clone().add(new THREE.Vector3(x,y,z));
-      }
-      tries++;
-      // Enforce a clear starting bubble in field 0
-    }while(fIdx===0 && P.distanceTo(START_CENTER)<START_CLEAR_R && tries<12);
-    return P;
+    const minR = (fIdx===0) ? (START_CLEAR_R + 400) : 0; // force everything outside the bubble in F0
+
+    if(clustered){
+      // Clustered placement: choose a random direction and push at least minR away (if in start field)
+      const dir=new THREE.Vector3(R()*2-1,R()*0.6,R()*2-1).normalize();
+      const rr = (fIdx===0) ? (minR + 120 + Math.pow(R(),0.7)*320) : (160 + Math.pow(R(),0.7)*420);
+      const yj = (R()*2-1)*Math.min(280,beltH);
+      return center.clone().add(new THREE.Vector3(dir.x*rr, yj, dir.z*rr));
+    } else {
+      // Ring placement with inner radius clamp on start field
+      const a=R()*Math.PI*2, rRaw=beltR+(R()*2-1)*beltW, r=(fIdx===0)?Math.max(rRaw, minR):rRaw;
+      const x=Math.cos(a)*r, z=Math.sin(a)*r, y=(R()*2-1)*beltH;
+      return center.clone().add(new THREE.Vector3(x,y,z));
+    }
   }
   function choosePoolByMat(mat){ for(const p of pools){ if(p.inst.material===mat && p.idx<p.count) return p; } return null; }
   function spawnTo(pool, P, size, hp, color, type){
@@ -645,18 +637,31 @@ async function buildAsteroidsAsync(seed, progress){
 
   for(let f=0; f<fields; f++){
     const rocks=rockPer+(rRem-->0?1:0);
-    const crystals=crystalPer+(cRem-->0?1:0);
+    // Make crystals even rarer in start field (halve there)
+    const crystalsBase=crystalPer+(cRem-->0?1:0);
+    const crystals = (f===0)?Math.floor(crystalsBase*0.5):crystalsBase;
     const metals=metalPer+(mRem-->0?1:0);
-    for(let i=0;i<clustersPer;i++){ const P=posInField(f,true); const size=6+Math.pow(R(),2)*40; const hp=Math.round(size*1.2+30);
-      spawnTo(choosePoolByMat(matRock),P,size,hp,makeColRock(),'rock'); if((i&255)===0){ progress&&progress('Clusters…'); await nextFrame(); } }
-    for(let i=0;i<rocks;i++){ const P=posInField(f,false); const size=6+Math.pow(R(),2)*40; const hp=Math.round(size*1.2+30);
-      spawnTo(choosePoolByMat(matRock),P,size,hp,makeColRock(),'rock'); if((i&511)===0){ progress&&progress('Rocks…'); await nextFrame(); } }
-    for(let i=0;i<crystals;i++){ const P=(R()<0.35)?posInField(f,true):posInField(f,false); const size=5+Math.pow(R(),1.8)*28; const hp=Math.round(size*1.0+24);
-      spawnTo(choosePoolByMat(matCrystal),P,size,hp,makeColCrystal(),'crystal'); if((i&511)===0){ progress&&progress('Crystals…'); await nextFrame(); } }
-    for(let i=0;i<metals;i++){ const P=(R()<0.25)?posInField(f,true):posInField(f,false); const size=8+Math.pow(R(),2.2)*36; const hp=Math.round(size*1.35+40);
-      spawnTo(choosePoolByMat(matMetal),P,size,hp,makeColMetal(),'metal'); if((i&511)===0){ progress&&progress('Metals…'); await nextFrame(); } }
-    for(let i=0;i<giantsPer;i++){ const P=posInField(f,false); const size=60+R()*70; const hp=Math.round(size*1.9+160);
-      spawnTo(choosePoolByMat(matRock),P,size,hp,makeColRock(),'rock'); }
+
+    for(let i=0;i<clustersPer;i++){
+      const P=posInField(f,true); const size=6+Math.pow(R(),2)*40; const hp=Math.round(size*1.2+30);
+      spawnTo(choosePoolByMat(matRock),P,size,hp,makeColRock(),'rock'); if((i&255)===0){ progress&&progress('Clusters…'); await nextFrame(); }
+    }
+    for(let i=0;i<rocks;i++){
+      const P=posInField(f,false); const size=6+Math.pow(R(),2)*40; const hp=Math.round(size*1.2+30);
+      spawnTo(choosePoolByMat(matRock),P,size,hp,makeColRock(),'rock'); if((i&511)===0){ progress&&progress('Rocks…'); await nextFrame(); }
+    }
+    for(let i=0;i<crystals;i++){
+      const P=(R()<0.35)?posInField(f,true):posInField(f,false); const size=5+Math.pow(R(),1.8)*28; const hp=Math.round(size*1.0+24);
+      spawnTo(choosePoolByMat(matCrystal),P,size,hp,makeColCrystal(),'crystal'); if((i&511)===0){ progress&&progress('Crystals…'); await nextFrame(); }
+    }
+    for(let i=0;i<metals;i++){
+      const P=(R()<0.25)?posInField(f,true):posInField(f,false); const size=8+Math.pow(R(),2.2)*36; const hp=Math.round(size*1.35+40);
+      spawnTo(choosePoolByMat(matMetal),P,size,hp,makeColMetal(),'metal'); if((i&511)===0){ progress&&progress('Metals…'); await nextFrame(); }
+    }
+    for(let i=0;i<giantsPer;i++){
+      const P=posInField(f,false); const size=60+R()*70; const hp=Math.round(size*1.9+160);
+      spawnTo(choosePoolByMat(matRock),P,size,hp,makeColRock(),'rock');
+    }
   }
   finalizePools();
   buildFieldFX(START_CENTER, START_CLEAR_R);
@@ -889,7 +894,7 @@ function showTarget(rock){
   ui.tgtHud.textContent = `${rock.type||'asteroid'} · ${Math.max(0,rock.hp|0)} HP · ${camera.position.distanceTo(pos).toFixed(0)} m`;
 }
 
-/* ---------- Nav (stable edge clamp + smoothing + cycle) ---------- */
+/* ---------- Nav (edge clamp + smoothing + cycle) ---------- */
 const NAV={ px:innerWidth/2, py:40, targetIdx:0,
   currentPos(){ if(this.targetIdx===0) return STATION.pos; const f=FIELDS[this.targetIdx-1]; return f?f.center:STATION.pos; },
   currentName(){ return this.targetIdx===0?'STATION':('FIELD '+String.fromCharCode(65+this.targetIdx-1)); },
@@ -899,11 +904,10 @@ function updateNavHUD(worldPos,dt){
   const w=innerWidth, h=innerHeight, pad=22;
   const padNdcX = pad/(w*0.5), padNdcY = pad/(h*0.5);
 
-  // Camera-space to detect behind
   const cp = worldPos.clone().applyMatrix4(camera.matrixWorldInverse);
   const behind = cp.z > 0;
   let v = worldPos.clone().project(camera);
-  if(behind){ v.x = -v.x; v.y = -v.y; } // flip when behind
+  if(behind){ v.x = -v.x; v.y = -v.y; }
 
   const m = Math.max(Math.abs(v.x), Math.abs(v.y), 1e-6);
   v.x /= m; v.y /= m;
@@ -913,7 +917,6 @@ function updateNavHUD(worldPos,dt){
   const targetX = (v.x*0.5+0.5)*w;
   const targetY = (-v.y*0.5+0.5)*h;
 
-  // Smoothing to suppress jitter
   const alpha = 1 - Math.pow(0.001, dt*60*0.9);
   NAV.px = lerp(NAV.px, targetX, alpha);
   NAV.py = lerp(NAV.py, targetY, alpha);
@@ -956,22 +959,6 @@ function updateScreenFX(dt){
 let fpsAccum=0, fpsFrames=0;
 function updateFPS(dt){ if(!fpsOn || paused) return; fpsAccum+=dt; fpsFrames++; if(fpsAccum>=0.25){ const fps=(fpsFrames/fpsAccum); const ms=(1000/fps); ui.fps.textContent=`${fps.toFixed(0)} fps · ${ms.toFixed(1)} ms`; fpsAccum=0; fpsFrames=0; } }
 
-function stableAutoLevel(dt){
-  if(!autoLevel || keys['KeyQ'] || keys['KeyE']) return;
-  const fwd=new THREE.Vector3(0,0,-1).applyQuaternion(ship.quat).normalize();
-  const worldUp=new THREE.Vector3(0,1,0);
-  const desiredRight = new THREE.Vector3().crossVectors(fwd, worldUp);
-  const len = desiredRight.length(); if(len<1e-3) return; desiredRight.divideScalar(len);
-  const desiredUp = new THREE.Vector3().crossVectors(desiredRight, fwd).normalize();
-  const right = new THREE.Vector3(1,0,0).applyQuaternion(ship.quat).normalize();
-  const rollErr = Math.atan2( right.dot(desiredUp), right.dot(desiredRight) );
-  const dead = rad(0.7); if(Math.abs(rollErr) < dead) return;
-  const Kp = 3.2, maxRate = rad(60);
-  const rate = THREE.MathUtils.clamp(-Kp*rollErr, -maxRate, maxRate);
-  const qTrim=new THREE.Quaternion().setFromAxisAngle(fwd, rate*dt);
-  ship.quat.premultiply(qTrim).normalize();
-}
-
 function handleInput(dt){
   if(paused) return;
 
@@ -982,7 +969,6 @@ function handleInput(dt){
   const qPitch=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),pitch);
   const qRoll=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),-roll);
   ship.quat.multiply(qYaw).multiply(qPitch).multiply(qRoll).normalize();
-  stableAutoLevel(dt);
 
   const fwd=new THREE.Vector3(0,0,-1).applyQuaternion(ship.quat);
   const up =new THREE.Vector3(0,1,0).applyQuaternion(ship.quat);
@@ -1106,7 +1092,7 @@ async function buildWorldAsync(s){
 
   Loader.sub('Spinning up station…'); buildStation(); await nextFrame(); Loader.pct(0.94);
 
-  // Start at the center bubble with space to turn
+  // Start at the center bubble with big space to turn
   const startField = FIELDS[0]?.center || new THREE.Vector3();
   ship.pos.copy(startField); ship.vel.set(0,0,0); ship.quat.identity();
 
@@ -1131,7 +1117,7 @@ function attachGlobalShortcuts(){
 
 async function init(){
   loadSettings();
-  autoLevel = Settings.autoLevel; baseFov = Settings.fov||75; quality = Settings.quality||quality;
+  baseFov = Settings.fov||75; quality = Settings.quality||quality;
   camera.fov=baseFov; camera.updateProjectionMatrix(); ui.qual.textContent=(quality==='ultra')?'Ultra':'High';
 
   bindShop(); load(); applyUpgrades();
