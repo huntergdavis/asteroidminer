@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>AstroMiner — Field Start • Stable Nav • Closer Station</title>
+<title>AstroMiner — Clear Start • Fewer Crystals • New Upgrades</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   :root{
@@ -15,7 +15,7 @@
   #app{position:fixed;inset:0;overflow:hidden}
 
   .hud{position:absolute;left:10px;top:10px;background:rgba(0,0,0,.45);padding:10px 12px;border-radius:12px;font-size:12px;backdrop-filter:blur(2px);line-height:1.25;z-index:5}
-  .shop{position:absolute;right:10px;top:10px;background:rgba(0,0,0,.55);padding:10px 12px;border-radius:12px;min-width:260px;max-width:400px;font-size:12px;z-index:7;display:none}
+  .shop{position:absolute;right:10px;top:10px;background:rgba(0,0,0,.55);padding:10px 12px;border-radius:12px;min-width:260px;max-width:420px;font-size:12px;z-index:7;display:none}
   .shop h3{margin:0 0 6px;font-size:13px}
   .row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:6px 0}
   .row button{background:#1f3b8f;border:0;color:#fff;padding:6px 8px;border-radius:8px;cursor:pointer}
@@ -60,7 +60,7 @@
 
   /* Modal overlays */
   .modalMask{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(2px);display:none;align-items:center;justify-content:center;z-index:15}
-  .modal{background:rgba(5,10,18,.92);border:1px solid #1b2a46;border-radius:14px;padding:14px 16px;min-width:300px;max-width:min(720px,90vw);color:#cfe6ff}
+  .modal{background:rgba(5,10,18,.92);border:1px solid #1b2a46;border-radius:14px;padding:14px 16px;min-width:300px;max-width:min(760px,90vw);color:#cfe6ff}
   .modal h3{margin:0 0 10px 0;font-size:14px}
   .grid{display:grid;grid-template-columns:1fr auto;gap:8px 10px;align-items:center}
   .btn{background:#1f3b8f;border:0;color:#fff;padding:6px 10px;border-radius:8px;cursor:pointer}
@@ -91,20 +91,23 @@
   <div class="row"><span>Laser Cooling Lv <b id="lvLaserC">1</b></span><button id="buyLaserC">Buy (<span id="costLaserC">150</span>)</button></div>
   <div class="row"><span>Laser ROF Lv <b id="lvRof">1</b></span><button id="buyRof">Buy (<span id="costRof">240</span>)</button></div>
   <div class="row"><span>Missile Damage Lv <b id="lvMissD">1</b></span><button id="buyMissD">Buy (<span id="costMissD">300</span>)</button></div>
+  <div class="row"><span>Missile Cooling Lv <b id="lvMissC">1</b></span><button id="buyMissC">Buy (<span id="costMissC">220</span>)</button></div>
   <div class="row"><span>Engine Thrust Lv <b id="lvThrust">1</b></span><button id="buyThrust">Buy (<span id="costThrust">250</span>)</button></div>
   <div class="row"><span>Turn Rate Lv <b id="lvTurn">1</b></span><button id="buyTurn">Buy (<span id="costTurn">200</span>)</button></div>
+  <div class="row"><span>Dampers Lv <b id="lvBrake">1</b></span><button id="buyBrake">Buy (<span id="costBrake">140</span>)</button></div>
   <div class="row"><span>Cargo Magnet Lv <b id="lvMag">1</b></span><button id="buyMag">Buy (<span id="costMag">180</span>)</button></div>
   <div class="row"><span>Range Extender Lv <b id="lvRange">1</b></span><button id="buyRange">Buy (<span id="costRange">260</span>)</button></div>
   <div class="row"><span>Cargo Hold Lv <b id="lvHold">1</b></span><button id="buyHold">Buy (<span id="costHold">220</span>)</button></div>
   <div class="row"><span>Refinery Yield Lv <b id="lvYield">1</b></span><button id="buyYield">Buy (<span id="costYield">300</span>)</button></div>
   <div class="row"><span>Afterburner Lv <b id="lvBoost">1</b></span><button id="buyBoost">Buy (<span id="costBoost">280</span>)</button></div>
   <div class="row"><span>Scanner Lv <b id="lvScan">1</b></span><button id="buyScan">Buy (<span id="costScan">230</span>)</button></div>
+  <div class="row"><span>Targeting Computer Lv <b id="lvTarget">1</b></span><button id="buyTarget">Buy (<span id="costTarget">260</span>)</button></div>
   <hr style="border-color:#234">
   <div class="row"><span class="k">Lightning Beam</span><button id="unlockLightning">Locked (1200)</button></div>
   <div class="row"><span class="k">Mass Driver</span><button id="unlockMass">Locked (900)</button></div>
   <div class="row"><span class="k">Gravity Gun</span><button id="unlockGrav">Locked (1500)</button></div>
   <div style="margin-top:6px;opacity:.75">
-    Shop: <b>U</b> · Quality: <b>1</b>/<b>2</b> · New Seed: <b>N</b> · Auto‑Level: <b>L</b> · Boost: <b>Shift</b> · FPS: <b>Shift+F</b>
+    Shop: <b>U</b> · Quality: <b>1</b>/<b>2</b> · New Seed: <b>N</b> · Auto‑Level: <b>L</b> · Boost: <b>Shift</b> · FPS: <b>Shift+F</b> · Cycle Nav: <b>H</b>
   </div>
 </div>
 
@@ -209,6 +212,11 @@ const ui={
   lvRof:byId('lvRof'), costRof:byId('costRof'),
   lvBoost:byId('lvBoost'), costBoost:byId('costBoost'),
   lvScan:byId('lvScan'), costScan:byId('costScan'),
+  // New
+  lvMissC:byId('lvMissC'), costMissC:byId('costMissC'),
+  lvBrake:byId('lvBrake'), costBrake:byId('costBrake'),
+  lvTarget:byId('lvTarget'), costTarget:byId('costTarget'),
+
   ref:byId('uiRef'),
   flash:byId('flash'),
   fps:byId('fps'),
@@ -224,7 +232,9 @@ const ui={
     buyThrust:byId('buyThrust'), buyTurn:byId('buyTurn'), buyMag:byId('buyMag'),
     buyRange:byId('buyRange'), buyHold:byId('buyHold'), buyYield:byId('buyYield'),
     buyRof:byId('buyRof'), buyBoost:byId('buyBoost'), buyScan:byId('buyScan'),
-    unlockLightning:byId('unlockLightning'), unlockMass:byId('unlockMass'), unlockGrav:byId('unlockGrav')
+    unlockLightning:byId('unlockLightning'), unlockMass:byId('unlockMass'), unlockGrav:byId('unlockGrav'),
+    // New
+    buyMissC:byId('buyMissC'), buyBrake:byId('buyBrake'), buyTarget:byId('buyTarget')
   }
 };
 function toast(msg,ms=1200){ ui.toast.textContent=msg; ui.toast.style.display='block'; clearTimeout(toast._t); toast._t=setTimeout(()=>ui.toast.style.display='none',ms); }
@@ -319,55 +329,95 @@ const ship={
   cargo:0, cargoCap:100, credits:0,
   laser:{ canFire:true, heat:0, over:false, cooldown:30, shotHeat:18, dmg:50, rof:10, _cd:0 },
   missile:{ canFire:true, heat:0, over:false, cooldown:18, shotHeat:34, dmg:240, reload:0.7, _cd:0 },
-  boost:{ cap:2.0, regen:0.55, val:2.0, mult:2.1 }
+  boost:{ cap:2.0, regen:0.55, val:2.0, mult:2.1 },
+  brakeCoeff:0.90, // upgraded by Dampers
+  seekStrength:0.02 // upgraded by Targeting Computer
 };
 let autoLevel=true;
 let baseFov=75, fovKick=0, flashAmt=0, shakeT=0, shakeAmp=0;
 
 const shipGroup=new THREE.Group(); scene.add(shipGroup); shipGroup.visible=false;
 const HP_LOCAL = { laserL:new THREE.Vector3(-0.9,0.55,-1.6), laserR:new THREE.Vector3(0.9,0.55,-1.6), missile:new THREE.Vector3(0,-0.05,-1.9) };
-const eyeLocal = new THREE.Vector3(0,0,0); // a touch tighter in the field
+const eyeLocal = new THREE.Vector3(0,0,0);
 function hardpointWorld(local){ return local.clone().applyQuaternion(ship.quat).add(ship.pos); }
 
 /* ---------- Upgrades & Shop ---------- */
-const upgrades={ laserD:1, laserC:1, rof:1, missD:1, thrust:1, turn:1, magnet:1, range:1, hold:1, yield:1, boost:1, scan:1, lightning:false, mass:false, grav:false };
-const baseCosts={ laserD:200, laserC:150, rof:240, missD:300, thrust:250, turn:200, magnet:180, range:260, hold:220, yield:300, boost:280, scan:230 };
-const MAX={ laserD:8, laserC:8, rof:7, missD:8, thrust:8, turn:8, magnet:8, range:8, hold:8, yield:6, boost:6, scan:6 };
+const upgrades={
+  laserD:1, laserC:1, rof:1, missD:1, missC:1,
+  thrust:1, turn:1, brake:1, magnet:1,
+  range:1, hold:1, yield:1, boost:1, scan:1, target:1,
+  lightning:false, mass:false, grav:false
+};
+const baseCosts={
+  laserD:200, laserC:150, rof:240, missD:300, missC:220,
+  thrust:250, turn:200, brake:140, magnet:180,
+  range:260, hold:220, yield:300, boost:280, scan:230, target:260
+};
+const MAX={ laserD:8, laserC:8, rof:7, missD:8, missC:7, thrust:8, turn:8, brake:6, magnet:8, range:8, hold:8, yield:6, boost:6, scan:6, target:6 };
 function levelCost(base,lv){ return Math.round(base * Math.pow(1.6, lv-1)); }
 function applyUpgrades(){
   ship.laser.dmg=50+(upgrades.laserD-1)*18;
   ship.laser.cooldown=30+(upgrades.laserC-1)*6;
   ship.laser.shotHeat=Math.max(8,18-(upgrades.laserC-1)*2);
   ship.laser.rof = 10 + (upgrades.rof-1)*2;
+
   ship.missile.dmg=240+(upgrades.missD-1)*80;
-  ship.thrust = 48 + (upgrades.thrust-1)*7; ship.strafe = 36 + (upgrades.thrust-1)*6; ship.lift = 36 + (upgrades.thrust-1)*6;
+  ship.missile.cooldown=18+(upgrades.missC-1)*7; // faster heat bleed
+  ship.missile.shotHeat=Math.max(16,34-(upgrades.missC-1)*2);
+
+  ship.thrust = 48 + (upgrades.thrust-1)*7;
+  ship.strafe = 36 + (upgrades.thrust-1)*6;
+  ship.lift   = 36 + (upgrades.thrust-1)*6;
   ship.maxSpeed = 300 + (upgrades.thrust-1)*24;
-  ship.yawRate=rad(100+(upgrades.turn-1)*10); ship.pitchRate=rad(100+(upgrades.turn-1)*10); ship.rollRate=rad(180+(upgrades.turn-1)*18);
+
+  ship.yawRate  = rad(100+(upgrades.turn-1)*10);
+  ship.pitchRate= rad(100+(upgrades.turn-1)*10);
+  ship.rollRate = rad(180+(upgrades.turn-1)*18);
+
+  ship.brakeCoeff = clamp(0.90 + (upgrades.brake-1)*0.02, 0.90, 0.98);
+
   ship.cargoCap = 100 + (upgrades.hold-1)*80;
   ship.range = 3800 + (upgrades.range-1)*420;
   ship.scannerRange = 4200 + (upgrades.scan-1)*1400;
-  ship.boost.cap = 2.0 + (upgrades.boost-1)*0.9; ship.boost.regen = 0.55 + (upgrades.boost-1)*0.25; ship.boost.mult = 2.1 + (upgrades.boost-1)*0.12; ship.boost.val = Math.min(ship.boost.val, ship.boost.cap);
+
+  ship.boost.cap = 2.0 + (upgrades.boost-1)*0.9;
+  ship.boost.regen = 0.55 + (upgrades.boost-1)*0.25;
+  ship.boost.mult = 2.1 + (upgrades.boost-1)*0.12;
+  ship.boost.val = Math.min(ship.boost.val, ship.boost.cap);
+
+  ship.seekStrength = clamp(0.02 + (upgrades.target-1)*0.006, 0.02, 0.05);
 }
 
 /* ---------- Shop wiring ---------- */
 function refreshShop(){
   const C=ui.buttons, cVals={}, set=(k)=>cVals[k]=levelCost(baseCosts[k], upgrades[k]+1);
-  ['laserD','laserC','rof','missD','thrust','turn','magnet','range','hold','yield','boost','scan'].forEach(set);
-  ['laserD','laserC','missD','thrust','turn','magnet','range','hold','yield','rof','boost','scan'].forEach(k=>{
-    const id=('lv'+(k[0].toUpperCase()+k.slice(1))).replace('Magnet','Mag');
-    byId(id).textContent=upgrades[k];
-  });
-  ui.costLaserD.textContent=cVals.laserD; ui.costLaserC.textContent=cVals.laserC; ui.costMissD.textContent=cVals.missD;
-  ui.costThrust.textContent=cVals.thrust; ui.costTurn.textContent=cVals.turn; ui.costMag.textContent=cVals.magnet;
-  ui.costRange.textContent=cVals.range; ui.costHold.textContent=cVals.hold; ui.costYield.textContent=cVals.yield;
-  ui.costRof.textContent=cVals.rof; ui.costBoost.textContent=cVals.boost; ui.costScan.textContent=cVals.scan;
+  ['laserD','laserC','rof','missD','missC','thrust','turn','brake','magnet','range','hold','yield','boost','scan','target'].forEach(set);
+
+  // Levels
+  const setLv=(id,val)=>{ byId(id).textContent=val; };
+  setLv('lvLaserD',upgrades.laserD); setLv('lvLaserC',upgrades.laserC); setLv('lvRof',upgrades.rof);
+  setLv('lvMissD',upgrades.missD); setLv('lvMissC',upgrades.missC);
+  setLv('lvThrust',upgrades.thrust); setLv('lvTurn',upgrades.turn); setLv('lvBrake',upgrades.brake);
+  setLv('lvMag',upgrades.magnet); setLv('lvRange',upgrades.range); setLv('lvHold',upgrades.hold);
+  setLv('lvYield',upgrades.yield); setLv('lvBoost',upgrades.boost); setLv('lvScan',upgrades.scan); setLv('lvTarget',upgrades.target);
+
+  // Costs
+  ui.costLaserD.textContent=cVals.laserD; ui.costLaserC.textContent=cVals.laserC; ui.costRof.textContent=cVals.rof;
+  ui.costMissD.textContent=cVals.missD; ui.costMissC.textContent=cVals.missC;
+  ui.costThrust.textContent=cVals.thrust; ui.costTurn.textContent=cVals.turn; ui.costBrake.textContent=cVals.brake;
+  ui.costMag.textContent=cVals.magnet; ui.costRange.textContent=cVals.range; ui.costHold.textContent=cVals.hold;
+  ui.costYield.textContent=cVals.yield; ui.costBoost.textContent=cVals.boost; ui.costScan.textContent=cVals.scan; ui.costTarget.textContent=cVals.target;
+
   const can=(k)=>ship.credits>=cVals[k] && upgrades[k]<MAX[k];
   const capText=(k)=> (upgrades[k]>=MAX[k])?'MAX':'Buy ('+cVals[k]+')';
-  const setBtn=(btn,key)=>{ btn.disabled=!can(key); btn.textContent=capText(key); };
-  setBtn(ui.buttons.buyLaserD,'laserD'); setBtn(ui.buttons.buyLaserC,'laserC'); setBtn(ui.buttons.buyMissD,'missD');
-  setBtn(ui.buttons.buyThrust,'thrust'); setBtn(ui.buttons.buyTurn,'turn'); setBtn(ui.buttons.buyMag,'magnet');
-  setBtn(ui.buttons.buyRange,'range'); setBtn(ui.buttons.buyHold,'hold'); setBtn(ui.buttons.buyYield,'yield');
-  setBtn(ui.buttons.buyRof,'rof'); setBtn(ui.buttons.buyBoost,'boost'); setBtn(ui.buttons.buyScan,'scan');
+  function setBtn(btn,key){ btn.disabled=!can(key); btn.textContent=capText(key); }
+
+  setBtn(C.buyLaserD,'laserD'); setBtn(C.buyLaserC,'laserC'); setBtn(C.buyRof,'rof');
+  setBtn(C.buyMissD,'missD'); setBtn(C.buyMissC,'missC');
+  setBtn(C.buyThrust,'thrust'); setBtn(C.buyTurn,'turn'); setBtn(C.buyBrake,'brake');
+  setBtn(C.buyMag,'magnet'); setBtn(C.buyRange,'range'); setBtn(C.buyHold,'hold');
+  setBtn(C.buyYield,'yield'); setBtn(C.buyBoost,'boost'); setBtn(C.buyScan,'scan'); setBtn(C.buyTarget,'target');
+
   const setUnlock=(key,btn,price)=>{ if(upgrades[key]){ btn.textContent='Unlocked'; btn.disabled=true; } else { btn.textContent=`Unlock (${price})`; btn.disabled=(ship.credits<price); } };
   setUnlock('lightning', ui.buttons.unlockLightning, 1200);
   setUnlock('mass',      ui.buttons.unlockMass,       900);
@@ -381,14 +431,17 @@ function bindShop(){
   B.buyLaserC.addEventListener('click',()=>tryBuy('laserC','Laser Cooling'));
   B.buyRof.addEventListener('click',()=>tryBuy('rof','Laser ROF'));
   B.buyMissD.addEventListener('click',()=>tryBuy('missD','Missile Damage'));
+  B.buyMissC.addEventListener('click',()=>tryBuy('missC','Missile Cooling'));
   B.buyThrust.addEventListener('click',()=>tryBuy('thrust','Engine Thrust'));
   B.buyTurn.addEventListener('click',()=>tryBuy('turn','Turn Rate'));
+  B.buyBrake.addEventListener('click',()=>tryBuy('brake','Dampers'));
   B.buyMag.addEventListener('click',()=>tryBuy('magnet','Cargo Magnet'));
   B.buyRange.addEventListener('click',()=>tryBuy('range','Range Extender'));
   B.buyHold.addEventListener('click',()=>tryBuy('hold','Cargo Hold'));
   B.buyYield.addEventListener('click',()=>tryBuy('yield','Refinery Yield'));
   B.buyBoost.addEventListener('click',()=>tryBuy('boost','Afterburner'));
   B.buyScan.addEventListener('click',()=>tryBuy('scan','Scanner'));
+  B.buyTarget.addEventListener('click',()=>tryBuy('target','Targeting Computer'));
 }
 
 /* ---------- Saving ---------- */
@@ -452,23 +505,27 @@ const MISSILES=[], LASER_BEAMS=[];
 let FIELDS=[]; // {center:Vector3}
 const FIELD_FX={ group:new THREE.Group(), dust:[] }; scene.add(FIELD_FX.group);
 function clearFieldFX(){ for(const s of FIELD_FX.dust){ FIELD_FX.group.remove(s); s.material.map.dispose(); s.material.dispose(); } FIELD_FX.dust.length=0; }
-function buildFieldFX(){
+function buildFieldFX(startCenter,clearR){
   clearFieldFX();
   const dustTex = makeGlowTexture(512, 0.0, 1.0, 'rgba(110,160,220,0.35)');
   for(const f of FIELDS){
     for(let i=0;i<2;i++){
       const s=new THREE.Sprite(new THREE.SpriteMaterial({map:dustTex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.18}));
-      s.position.copy(f.center.clone().add(new THREE.Vector3((Math.random()-0.5)*400,(Math.random()-0.5)*150,(Math.random()-0.5)*400)));
+      let pos;
+      // keep dust outside the starter bubble if in field 0
+      let tries=0;
+      do{
+        pos=f.center.clone().add(new THREE.Vector3((Math.random()-0.5)*400,(Math.random()-0.5)*150,(Math.random()-0.5)*400));
+        tries++;
+      }while(f.center.equals(startCenter) && pos.distanceTo(startCenter)<clearR*1.3 && tries<10);
+      s.position.copy(pos);
       s.scale.set(1400+Math.random()*600, 1400+Math.random()*600, 1);
       FIELD_FX.group.add(s); FIELD_FX.dust.push(s);
     }
   }
 }
 
-/* Rsc kinds for future economy (kept) */
-const RES_KINDS=[{name:'Iron',val:8,color:0xa0a8b8},{name:'Nickel',val:10,color:0x9fb7aa},{name:'Silver',val:14,color:0xc0c0ff},{name:'Gold',val:22,color:0xffd54a},{name:'Platinum',val:30,color:0xd9d9ff},{name:'Iridium',val:40,color:0xa3d1ff}];
-
-/* ---------- Rock / Crystal / Metal geometry ---------- */
+/* ---------- Procedural shapes ---------- */
 function hash3(x,y,z){ return (Math.sin(x*127.1 + y*311.7 + z*74.7)*43758.5453)%1; }
 function fbm3(x,y,z,oct=3){ let a=0, amp=1, freq=1; for(let i=0;i<oct;i++){ a+= (hash3(x*freq,y*freq,z*freq)*2-1)*amp; freq*=2.07; amp*=0.55; } return a; }
 function geoRock(seed,scale=1){ const g=new THREE.IcosahedronGeometry(scale,1),pos=g.attributes.position;
@@ -512,13 +569,17 @@ async function buildAsteroidsAsync(seed, progress){
   const basePerField = (quality==='ultra')?850:650;
   const baseCount = basePerField * fields;
 
-  const frac = { rock:0.72, crystal:0.23, metal:0.04, giants:0.01 }; // metals rare
+  // Rebalanced: fewer crystals (you asked!), metals still rare
+  const frac = { rock:0.82, crystal:0.12, metal:0.05, giants:0.01 };
   const counts={ rock:Math.floor(baseCount*frac.rock), crystal:Math.floor(baseCount*frac.crystal), metal:Math.floor(baseCount*frac.metal), giants:Math.floor(baseCount*frac.giants) };
   const extraCluster = Math.floor(baseCount*0.08);
 
-  // Field centers: one at origin (start field), rest on smaller ring (~halved)
-  const ringR = (quality==='ultra')?8000:6500; // was ~16000/13000
-  FIELDS.push({center:new THREE.Vector3(0,0,0)});
+  // Field centers: one at origin (start field), others on ring
+  const ringR = (quality==='ultra')?8000:6500;
+  const START_CENTER = new THREE.Vector3(0,0,0);
+  const START_CLEAR_R = 420; // carve out a safe bubble for turning
+
+  FIELDS.push({center:START_CENTER.clone()});
   for(let i=1;i<fields;i++){
     const a = (i/(fields-1))*Math.PI*2 + R()*0.25;
     const c=new THREE.Vector3(Math.cos(a)*ringR,(R()*2-1)*420,Math.sin(a)*ringR);
@@ -550,13 +611,20 @@ async function buildAsteroidsAsync(seed, progress){
   const beltR=2200,beltW=1000,beltH=700;
   function posInField(fIdx, clustered=false){
     const center=FIELDS[fIdx].center;
-    if(clustered){
-      const rad=160+R()*260; const dir=new THREE.Vector3(R()*2-1,R()*2-1,R()*2-1).normalize(); const d=rad*Math.pow(R(),0.7);
-      return center.clone().addScaledVector(dir,d);
-    }else{
-      const a=R()*Math.PI*2, r=beltR+(R()*2-1)*beltW, x=Math.cos(a)*r, z=Math.sin(a)*r, y=(R()*2-1)*beltH;
-      return center.clone().add(new THREE.Vector3(x,y,z));
-    }
+    let P;
+    let tries=0;
+    do{
+      if(clustered){
+        const rad=160+R()*260; const dir=new THREE.Vector3(R()*2-1,R()*2-1,R()*2-1).normalize(); const d=rad*Math.pow(R(),0.7);
+        P = center.clone().addScaledVector(dir,d);
+      }else{
+        const a=R()*Math.PI*2, r=beltR+(R()*2-1)*beltW, x=Math.cos(a)*r, z=Math.sin(a)*r, y=(R()*2-1)*beltH;
+        P = center.clone().add(new THREE.Vector3(x,y,z));
+      }
+      tries++;
+      // Enforce a clear starting bubble in field 0
+    }while(fIdx===0 && P.distanceTo(START_CENTER)<START_CLEAR_R && tries<12);
+    return P;
   }
   function choosePoolByMat(mat){ for(const p of pools){ if(p.inst.material===mat && p.idx<p.count) return p; } return null; }
   function spawnTo(pool, P, size, hp, color, type){
@@ -569,7 +637,7 @@ async function buildAsteroidsAsync(seed, progress){
   }
   function finalizePools(){ for(const p of pools){ p.inst.count=p.idx; p.inst.instanceMatrix.needsUpdate=true; p.inst.instanceColor.needsUpdate=true; } }
 
-  // distribute per field
+  // Distribute per field
   const share=(n)=>Math.floor(n/fields), rem=(n)=>n-share(n)*fields;
   let rRem=rem(counts.rock), cRem=rem(counts.crystal), mRem=rem(counts.metal);
   const rockPer=share(counts.rock), crystalPer=share(counts.crystal), metalPer=share(counts.metal);
@@ -591,7 +659,7 @@ async function buildAsteroidsAsync(seed, progress){
       spawnTo(choosePoolByMat(matRock),P,size,hp,makeColRock(),'rock'); }
   }
   finalizePools();
-  buildFieldFX();
+  buildFieldFX(START_CENTER, START_CLEAR_R);
 }
 
 /* ---------- Drops ---------- */
@@ -625,7 +693,7 @@ function addDropsOnDestroy(a){
     spawnDrop(pos,Math.round(baseScale*12+Math.random()*20),col,baseScale);
   }
 }
-function maybeChipLoot(p){ if(Math.random()<0.25) spawnDrop(p,Math.round(10+Math.random()*10),0xc0c0ff,1.2); }
+function maybeChipLoot(p){ if(Math.random()<0.2) spawnDrop(p,Math.round(10+Math.random()*10),0xc0c0ff,1.2); }
 function destroyAsteroid(rec){
   if(!rec.alive) return; rec.alive=false;
   const inst=AST.inst[rec.gi], m=new THREE.Matrix4();
@@ -716,7 +784,7 @@ function rayHitAsteroids(origin,dir,maxRange){
 }
 
 /* ---------- Station (half distance) ---------- */
-const STATION={ group:null, pos:new THREE.Vector3(0,0,-11000), arm:null }; // was -22000
+const STATION={ group:null, pos:new THREE.Vector3(0,0,-11000), arm:null };
 function buildStation(){
   if(STATION.group){ scene.remove(STATION.group); }
   const g=new THREE.Group();
@@ -773,7 +841,7 @@ function makePip(color){
 function ensurePips(n){ while(SCAN.sprites.length<n){ const c=(SCAN.sprites.length&1)?'255,200,120':'150,230,255'; SCAN.sprites.push(makePip(c)); } }
 function updateScan(dt){
   SCAN.last+=dt; if(SCAN.last<0.75) return; SCAN.last=0;
-  const maxPips=40; ensurePips(maxPips);
+  const maxPips=20 + upgrades.scan*12; ensurePips(maxPips);
   const center=ship.pos; const cand=[];
   for(const a of AST.data){ if(!a.alive||a.type==='rock') continue;
     const dx=a.x-center.x, dy=a.y-center.y, dz=a.z-center.z; const d2=dx*dx+dy*dy+dz*dz; if(d2>ship.scannerRange*ship.scannerRange) continue; cand.push([d2,a]); }
@@ -831,13 +899,12 @@ function updateNavHUD(worldPos,dt){
   const w=innerWidth, h=innerHeight, pad=22;
   const padNdcX = pad/(w*0.5), padNdcY = pad/(h*0.5);
 
-  // Project to NDC and detect behind via camera space Z
+  // Camera-space to detect behind
   const cp = worldPos.clone().applyMatrix4(camera.matrixWorldInverse);
-  const behind = cp.z > 0; // in camera space, z<0 is in front
-  let v = worldPos.clone().project(camera); // NDC
+  const behind = cp.z > 0;
+  let v = worldPos.clone().project(camera);
   if(behind){ v.x = -v.x; v.y = -v.y; } // flip when behind
 
-  // Normalize into screen box (kill jitter by keeping on border)
   const m = Math.max(Math.abs(v.x), Math.abs(v.y), 1e-6);
   v.x /= m; v.y /= m;
   v.x = clamp(v.x, -1+padNdcX, 1-padNdcX);
@@ -846,8 +913,8 @@ function updateNavHUD(worldPos,dt){
   const targetX = (v.x*0.5+0.5)*w;
   const targetY = (-v.y*0.5+0.5)*h;
 
-  // Smooth follow to suppress jitter
-  const alpha = 1 - Math.pow(0.001, dt*60*0.9); // ~0.1..0.2 per frame
+  // Smoothing to suppress jitter
+  const alpha = 1 - Math.pow(0.001, dt*60*0.9);
   NAV.px = lerp(NAV.px, targetX, alpha);
   NAV.py = lerp(NAV.py, targetY, alpha);
 
@@ -934,7 +1001,7 @@ function handleInput(dt){
   ship.vel.addScaledVector(right,thrustX*ship.strafe*mult*dt);
   ship.vel.addScaledVector(up,thrustY*ship.lift*mult*dt);
 
-  if(keys['KeyZ']) ship.vel.multiplyScalar(Math.pow(1-0.9,dt*60)); else ship.vel.multiplyScalar(1-ship.dampingLin*dt);
+  if(keys['KeyZ']) ship.vel.multiplyScalar(Math.pow(1-ship.brakeCoeff,dt*60)); else ship.vel.multiplyScalar(1-ship.dampingLin*dt);
   const spd=ship.vel.length(); if(spd>ship.maxSpeed*mult) ship.vel.multiplyScalar((ship.maxSpeed*mult)/spd);
 
   if(keys['Space']) fireLaser();
@@ -947,7 +1014,10 @@ function updateMissiles(dt){
   for(let i=MISSILES.length-1;i>=0;i--){
     const m=MISSILES[i];
     const {origin,dir}=getReticleRay(); const pick=rayHitAsteroids(origin,dir,1600);
-    if(pick.hit){ const aim=pick.point.clone().sub(m.pos).normalize(); m.vel.lerp(aim.multiplyScalar(200),0.02); }
+    if(pick.hit){
+      const aim=pick.point.clone().sub(m.pos).normalize();
+      m.vel.lerp(aim.multiplyScalar(200), ship.seekStrength); // stronger with Targeting Computer
+    }
     m.pos.addScaledVector(m.vel,dt); m.mesh.position.copy(m.pos); m.life-=dt;
     m.trailT=(m.trailT||0)+dt; if(m.trailT>0.03){ m.trailT=0; const s=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexOrange,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.8})); s.position.copy(m.pos); s.scale.set(5,5,1); s.userData.t=0; s.userData.life=0.35; FX.group.add(s); }
     let hit=null; for(const a of AST.data){ if(!a.alive) continue; const dx=m.pos.x-a.x,dy=m.pos.y-a.y,dz=m.pos.z-a.z,r=a.size*1.15; if(dx*dx+dy*dy+dz*dz<=r*r){ hit=a; break; } }
@@ -1004,7 +1074,6 @@ function loop(){
     sun.position.copy(ship.pos).add(new THREE.Vector3(1,0.2,0.3).multiplyScalar(30000));
   }
 
-  // Nav runs even while paused (so the pointer doesn't freeze)
   updateNavHUD(NAV.currentPos(), dt);
 
   updateUI(); renderer.render(scene,camera); requestAnimationFrame(loop);
@@ -1037,15 +1106,13 @@ async function buildWorldAsync(s){
 
   Loader.sub('Spinning up station…'); buildStation(); await nextFrame(); Loader.pct(0.94);
 
-  // Start inside Field A (near origin)
+  // Start at the center bubble with space to turn
   const startField = FIELDS[0]?.center || new THREE.Vector3();
-  const jitter = new THREE.Vector3((Math.random()-0.5)*200,(Math.random()-0.5)*120,(Math.random()-0.5)*200);
-  ship.pos.copy(startField).add(jitter); ship.vel.set(0,0,0); ship.quat.identity();
+  ship.pos.copy(startField); ship.vel.set(0,0,0); ship.quat.identity();
 
   ship.laser.heat=0; ship.laser.over=false; ship.laser._cd=0; ship.missile.heat=0; ship.missile.over=false; ship.missile._cd=0;
   ship.boost.val = ship.boost.cap;
 
-  // Reset NAV to Station by default
   NAV.targetIdx = 0; ui.navName.textContent = NAV.currentName();
 
   ui.seed.textContent=s; ui.cap.textContent=ship.cargoCap; updateUI(); Loader.pct(1.0); Loader.hide();
