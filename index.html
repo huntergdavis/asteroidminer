@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>AstroMiner — Laser Fix • Correct Waypoint • Mouse Wheel Throttle + MMB Roll</title>
+<title>AstroMiner — Gamepad Support • Laser Fix • Correct Waypoint</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   :root{
@@ -27,7 +27,7 @@
   .bar>span.warn{animation:blink .35s linear infinite alternate}
   @keyframes blink{from{filter:brightness(1)}to{filter:brightness(2.1)}}
   .cash{font-weight:700}
-  .help{position:absolute;left:10px;bottom:10px;background:rgba(0,0,0,.45);padding:8px 10px;border-radius:10px;font-size:12px;max-width:980px;z-index:5}
+  .help{position:absolute;left:10px;bottom:10px;background:rgba(0,0,0,.45);padding:8px 10px;border-radius:10px;font-size:12px;max-width:1040px;z-index:5}
   .toast{position:absolute;left:50%;transform:translateX(-50%);top:10px;background:rgba(0,0,0,.5);padding:6px 10px;border-radius:10px;font-size:12px;display:none;z-index:10}
   .err{position:absolute;right:10px;bottom:10px;background:#300;color:#fee;padding:8px 10px;border-radius:10px;max-width:60ch;display:none;white-space:pre-wrap;z-index:10}
 
@@ -60,7 +60,7 @@
 
   /* Modal overlays */
   .modalMask{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(2px);display:none;align-items:center;justify-content:center;z-index:15}
-  .modal{background:rgba(5,10,18,.92);border:1px solid #1b2a46;border-radius:14px;padding:14px 16px;min-width:300px;max-width:min(760px,90vw);color:#cfe6ff}
+  .modal{background:rgba(5,10,18,.92);border:1px solid #1b2a46;border-radius:14px;padding:14px 16px;min-width:300px;max-width:min(820px,90vw);color:#cfe6ff}
   .modal h3{margin:0 0 10px 0;font-size:14px}
   .grid{display:grid;grid-template-columns:1fr auto;gap:8px 10px;align-items:center}
   .btn{background:#1f3b8f;border:0;color:#fff;padding:6px 10px;border-radius:8px;cursor:pointer}
@@ -121,6 +121,7 @@
   <div>Forward/Reverse: <b>↑/↓</b> or <b>Mouse Wheel</b> · Strafe: <b>←/→</b> · Lift: <b>R/F</b> · Boost: <b>Shift</b></div>
   <div>Brake/Damp: <b>Z</b> · Laser: <b>Space</b>/<b>LMB</b> · Missile: <b>X</b>/<b>RMB</b> · Dock: <b>C</b> · Options: <b>O</b>/<b>Esc</b> · <b>Cycle Nav: H</b></div>
   <div>Mouse Aim (optional): <b>Click the playfield</b> to capture pointer · LMB fire laser · RMB fire missile · <b>MMB: Roll</b> · Wheel: Throttle · Esc to release.</div>
+  <div style="margin-top:6px"><b>Gamepad</b> — Look: <b>Left Stick</b>/<b>D‑Pad</b> · Throttle: <b>Right Stick Up/Down</b> or <b>RT/LT</b> · Roll: <b>RB/LB</b> · Laser: <b>A</b> · Missile: <b>B</b> · Dock: <b>Y</b> · Damp: <b>X (hold)</b> · Options: <b>Start</b></div>
 </div>
 
 <!-- Reticle -->
@@ -144,6 +145,13 @@
       <div>Mouse Aim</div><div><button class="btn sec" id="optMouse">—</button></div>
       <div>Quality</div><div><button class="btn sec" id="optQual">—</button></div>
       <div>FOV</div><div><button class="btn sec" id="optFovDown">−</button> <span id="optFovVal" class="muted">75</span> <button class="btn sec" id="optFovUp">+</button></div>
+      <div>Gamepad Y Invert</div><div><button class="btn sec" id="optGpInv">—</button></div>
+      <div>Gamepad Sens</div>
+      <div>
+        <button class="btn sec" id="optGpSensDown">−</button>
+        <span id="optGpSensVal" class="muted">1.00</span>
+        <button class="btn sec" id="optGpSensUp">+</button>
+      </div>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
       <button class="btn sec" id="optClose">Close</button>
@@ -193,7 +201,7 @@ function rng(seed){ let s=seed>>>0; return ()=>{ s+=0x6D2B79F5; let t=Math.imul(
 /* ---------- Scene ---------- */
 const app=document.getElementById('app');
 const scene=new THREE.Scene();
-const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,1,260000); // near=1 for stable depth
+const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,1,260000);
 camera.position.set(0,0,0);
 const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,logarithmicDepthBuffer:true,powerPreference:'high-performance'});
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -234,6 +242,7 @@ const ui={
   dsCredits:byId('dsCredits'), dsCargo:byId('dsCargo'), dsSpeed:byId('dsSpeed'),
   optSfx:byId('optSfx'), optMouse:byId('optMouse'), optQual:byId('optQual'),
   optFovDown:byId('optFovDown'), optFovUp:byId('optFovUp'), optFovVal:byId('optFovVal'),
+  optGpInv:byId('optGpInv'), optGpSensDown:byId('optGpSensDown'), optGpSensUp:byId('optGpSensUp'), optGpSensVal:byId('optGpSensVal'),
   mouseHint:byId('mouseHint'),
   buttons:{
     buyLaserD:byId('buyLaserD'), buyLaserC:byId('buyLaserC'), buyMissD:byId('buyMissD'),
@@ -280,7 +289,7 @@ addEventListener('keydown',e=>{
 addEventListener('keyup',e=>{ keys[e.code]=false; });
 
 /* ---------- Audio with toggle ---------- */
-const Settings = { sfx:true, mouseAim:true, fov:75, quality:'high' };
+const Settings = { sfx:true, mouseAim:true, fov:75, quality:'high', gpInvert:false, gpSens:1.0 };
 function loadSettings(){ try{ const j=localStorage.getItem('astrominer_settings'); if(j){ Object.assign(Settings, JSON.parse(j)); } }catch{} }
 function saveSettings(){ localStorage.setItem('astrominer_settings', JSON.stringify(Settings)); }
 
@@ -312,6 +321,8 @@ function updateOptionsMirror(){
   ui.optMouse.textContent = Settings.mouseAim?'On':'Off';
   ui.optQual.textContent= (quality==='ultra')?'Ultra':'High';
   ui.optFovVal.textContent = String(baseFov);
+  ui.optGpInv.textContent = Settings.gpInvert?'Inverted':'Normal';
+  ui.optGpSensVal.textContent = Settings.gpSens.toFixed(2);
 }
 function unlockPointer(){ try{ if(document.pointerLockElement) document.exitPointerLock(); }catch{} }
 function openOptions(){ unlockPointer(); setPaused(true,'options'); ui.optMask.style.display='flex'; updateOptionsMirror(); }
@@ -321,6 +332,9 @@ ui.optMouse.addEventListener('click',()=>{ Settings.mouseAim=!Settings.mouseAim;
 ui.optQual.addEventListener('click',()=>{ setQuality(quality==='ultra'?'high':'ultra'); updateOptionsMirror(); });
 ui.optFovDown.addEventListener('click',()=>{ baseFov=clamp(baseFov-2,60,95); Settings.fov=baseFov; camera.fov=baseFov; camera.updateProjectionMatrix(); saveSettings(); updateOptionsMirror(); });
 ui.optFovUp.addEventListener('click',()=>{ baseFov=clamp(baseFov+2,60,95); Settings.fov=baseFov; camera.fov=baseFov; camera.updateProjectionMatrix(); saveSettings(); updateOptionsMirror(); });
+ui.optGpInv.addEventListener('click',()=>{ Settings.gpInvert=!Settings.gpInvert; saveSettings(); updateOptionsMirror(); });
+ui.optGpSensDown.addEventListener('click',()=>{ Settings.gpSens=clamp(Settings.gpSens-0.1,0.4,2.0); saveSettings(); updateOptionsMirror(); });
+ui.optGpSensUp.addEventListener('click',()=>{ Settings.gpSens=clamp(Settings.gpSens+0.1,0.4,2.0); saveSettings(); updateOptionsMirror(); });
 byId('optClose').addEventListener('click',()=>closeOptions());
 
 /* ---------- Ship ---------- */
@@ -344,7 +358,7 @@ const HP_LOCAL = { laserL:new THREE.Vector3(-0.9,0.55,-1.6), laserR:new THREE.Ve
 const eyeLocal = new THREE.Vector3(0,0,0);
 function hardpointWorld(local){ return local.clone().applyQuaternion(ship.quat).add(ship.pos); }
 
-/* ---------- Mouse aim + wheel throttle + MMB roll (optional) ---------- */
+/* ---------- Mouse aim + wheel throttle + MMB roll ---------- */
 const MOUSE={yaw:0,pitch:0,roll:0,fireL:false,fireR:false,mmb:false,throttle:0,sens:0.0022,sensRoll:0.0032,locked:false};
 function updateMouseHint(){ ui.mouseHint.classList.toggle('hide', !Settings.mouseAim || MOUSE.locked || paused); }
 renderer.domElement.addEventListener('contextmenu',e=>{ e.preventDefault(); });
@@ -384,6 +398,71 @@ renderer.domElement.addEventListener('wheel', e=>{
   MOUSE.throttle = clamp(MOUSE.throttle + step, -1, 1);
 },{passive:false});
 window.addEventListener('blur',()=>{ MOUSE.fireL=false; MOUSE.fireR=false; });
+
+/* ---------- Gamepad (joystick) support ---------- */
+const GP={
+  connected:false, index:null,
+  dead:0.12,
+  btns:new Array(20).fill(false),
+  prev:new Array(20).fill(false),
+  yawAxis:0, pitchAxis:0, rollAxis:0, throttle:0,
+  dpadYaw:0, dpadPitch:0,
+  applyDead(v){ const a=Math.abs(v); if(a<=this.dead) return 0; const n=(a-this.dead)/(1-this.dead); return Math.sign(v)*n; },
+  poll(){
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    let g = (this.index!=null && pads[this.index]) || pads[0];
+    if(!g){ this.connected=false; return; }
+    this.connected=true; this.index=g.index;
+
+    // Axes (standard mapping)
+    const ax=g.axes||[];
+    const lx=this.applyDead(ax[0]||0);
+    const ly=this.applyDead(ax[1]||0);
+    const rx=this.applyDead(ax[2]||0);
+    const ry=this.applyDead(ax[3]||0);
+
+    // D-pad as coarse look nudges
+    const b=g.buttons||[];
+    const dUp = !!b[12]?.pressed, dDown=!!b[13]?.pressed, dLeft=!!b[14]?.pressed, dRight=!!b[15]?.pressed;
+
+    // Triggers (buttons or axes fallback)
+    let lt = (b[6]?.value!=null)? b[6].value : 0;
+    let rt = (b[7]?.value!=null)? b[7].value : 0;
+    if(lt===0 && rt===0 && ax.length>=6){
+      // Some browsers expose triggers on axes 4/5 as [-1..1]
+      const a4 = ax[4], a5=ax[5];
+      if(typeof a4==='number' && typeof a5==='number'){
+        lt = (a4+1)/2; rt=(a5+1)/2;
+      }
+    }
+    const trigThrottle = clamp(rt - lt, -1, 1);
+    const stickThrottle = -ry; // up (negative) -> forward positive
+    this.throttle = (Math.abs(trigThrottle)>0.05) ? trigThrottle : (Math.abs(stickThrottle)>0.05 ? stickThrottle : 0);
+
+    // Look on left stick (and D-pad)
+    this.yawAxis   = lx;
+    const lyAdj    = Settings.gpInvert ? ly : -ly;
+    this.pitchAxis = lyAdj;
+
+    // Roll: bumpers prefer, but right stick X also contributes slightly
+    const rb = !!b[5]?.pressed, lb=!!b[4]?.pressed;
+    const rollButtons = (rb? 1:0) - (lb? 1:0);
+    this.rollAxis = rollButtons + rx*0.65;
+
+    // D-pad nudges
+    this.dpadYaw   = (dRight?1:0) - (dLeft?1:0);
+    this.dpadPitch = (dUp?1:0) - (dDown?1:0);
+
+    // Buttons edge detection
+    for(let i=0;i<this.btns.length;i++){
+      this.prev[i]=this.btns[i];
+      this.btns[i]=!!b[i]?.pressed;
+    }
+  },
+  justPressed(i){ return this.btns[i] && !this.prev[i]; }
+};
+window.addEventListener('gamepadconnected', (e)=>{ GP.index=e.gamepad.index; GP.connected=true; toast('Gamepad connected'); });
+window.addEventListener('gamepaddisconnected', (e)=>{ if(GP.index===e.gamepad.index){ GP.connected=false; toast('Gamepad disconnected'); } });
 
 /* ---------- Upgrades & Shop ---------- */
 const upgrades={
@@ -782,7 +861,6 @@ function createLaserBeam(start,end){
   const startSprite=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexBlue,transparent:true,depthWrite:false,depthTest:true,blending:THREE.AdditiveBlending,opacity:0.95}));
   const endSprite  =new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexBlue,transparent:true,depthWrite:false,depthTest:true,blending:THREE.AdditiveBlending,opacity:0.95}));
   startSprite.scale.set(7,7,1); endSprite.scale.set(9,9,1);
-  // Harden against culling / ordering edge cases:
   core.frustumCulled = glow.frustumCulled = false;
   startSprite.frustumCulled = endSprite.frustumCulled = false;
   core.renderOrder = glow.renderOrder = startSprite.renderOrder = endSprite.renderOrder = 5;
@@ -808,7 +886,7 @@ function fireLaser(){
   const L=ship.laser; if(L.over||L._cd>0) return; L.heat+=L.shotHeat; if(L.heat>=100){ L.over=true; toast('Laser overheated!'); }
   L._cd=1/Math.max(3,ship.laser.rof);
 
-  // Compute a tiny forward offset so beams never start exactly on the near plane
+  // Offset from near-plane for robust visibility
   const {origin,dir}=getReticleRay(); const startOffset = dir.clone().multiplyScalar(0.25);
   const pick=rayHitAsteroids(origin,dir,ship.range); const endPoint=pick.point.clone();
   const startL=hardpointWorld(HP_LOCAL.laserL).add(startOffset);
@@ -888,9 +966,14 @@ function updateStation(dt){
   ui.ref.textContent=isFinite(dist)?dist.toFixed(0):'—';
   if(!docked){
     if(dist<180){
-      if(!dockPrompt){ toast('Press C to Dock (Station)'); dockPrompt=true; }
+      if(!dockPrompt){ toast('Press C or Y (gamepad) to Dock'); dockPrompt=true; }
       if(keys['KeyC']) openDockPanel();
+      // Gamepad dock/undock on Y
+      if(GP.connected && GP.justPressed(3)) openDockPanel();
     } else dockPrompt=false;
+  } else {
+    if(keys['KeyC']) closeDockPanel();
+    if(GP.connected && GP.justPressed(3)) closeDockPanel();
   }
 }
 
@@ -958,28 +1041,24 @@ const NAV={ px:innerWidth/2, py:40, targetIdx:0,
   nextTarget(){ const max=1+FIELDS.length; this.targetIdx=(this.targetIdx+1)%max; toast('Nav → '+this.currentName()); },
 };
 function updateNavHUD(worldPos,dt){
-  // Ensure camera matrices are current before projecting
   camera.updateMatrixWorld(true);
 
   const w=innerWidth, h=innerHeight, pad=22;
   const padNdcX = pad/(w*0.5), padNdcY = pad/(h*0.5);
 
-  // In-front test using camera forward vector (doesn't depend on matrixWorldInverse timing)
-  const forward=new THREE.Vector3(); camera.getWorldDirection(forward); // points toward -Z
+  const forward=new THREE.Vector3(); camera.getWorldDirection(forward);
   const toTarget = worldPos.clone().sub(camera.position);
   const inFront = toTarget.dot(forward) > 0;
 
-  // NDC projection
   let v = worldPos.clone().project(camera);
   let x = v.x, y = v.y;
   let mode = 'onscreen';
 
-  // If behind or outside the frustum, clamp to edge
   if(!inFront || x < -1 || x > 1 || y < -1 || y > 1){
     mode = 'edge';
-    if(!inFront){ x = -x; y = -y; } // mirror when behind for stable arrow
+    if(!inFront){ x = -x; y = -y; }
     const m = Math.max(Math.abs(x), Math.abs(y), 1e-6);
-    x /= m; y /= m; // bring to unit square edge
+    x /= m; y /= m;
     x = clamp(x, -1+padNdcX, 1-padNdcX);
     y = clamp(y, -1+padNdcY, 1-padNdcY);
   }
@@ -987,7 +1066,6 @@ function updateNavHUD(worldPos,dt){
   const targetX = (x*0.5+0.5)*w;
   const targetY = (-y*0.5+0.5)*h;
 
-  // Gentle smoothing to avoid jitter but still responsive when on-screen
   const alpha = mode==='edge' ? (1 - Math.pow(0.001, dt*60*0.9)) : (1 - Math.pow(0.001, dt*60*0.6));
   NAV.px = lerp(NAV.px, targetX, alpha);
   NAV.py = lerp(NAV.py, targetY, alpha);
@@ -1033,6 +1111,9 @@ function updateFPS(dt){ if(!fpsOn || paused) return; fpsAccum+=dt; fpsFrames++; 
 function handleInput(dt){
   if(paused) return;
 
+  // Poll gamepad (if any)
+  GP.poll();
+
   // Keyboard yaw/pitch/roll
   let yaw=((keys['KeyA']?1:0)-(keys['KeyD']?1:0))*ship.yawRate*dt;
   let pitch=((keys['KeyW']?1:0)-(keys['KeyS']?1:0))*ship.pitchRate*dt;
@@ -1046,6 +1127,16 @@ function handleInput(dt){
     MOUSE.yaw=0; MOUSE.pitch=0; MOUSE.roll=0;
   }
 
+  // Gamepad contributions
+  if(GP.connected){
+    const sens = Settings.gpSens;
+    // Left stick look + D‑pad nudge
+    yaw   += (GP.yawAxis + GP.dpadYaw*0.6) * ship.yawRate  * dt * sens;
+    pitch += (GP.pitchAxis+ GP.dpadPitch*0.6) * ship.pitchRate* dt * sens;
+    // Roll from bumpers / right stick X
+    roll  += GP.rollAxis * ship.rollRate * dt * sens * 0.9;
+  }
+
   const qYaw=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),yaw);
   const qPitch=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),pitch);
   const qRoll=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),-roll);
@@ -1055,9 +1146,10 @@ function handleInput(dt){
   const up =new THREE.Vector3(0,1,0).applyQuaternion(ship.quat);
   const right=new THREE.Vector3(1,0,0).applyQuaternion(ship.quat);
 
-  // Wheel throttle blended with arrow keys
+  // Forward input: wheel throttle + arrows + gamepad throttle
   const thrustFKeys=(keys['ArrowUp']?1:0)-(keys['ArrowDown']?1:0);
-  const forwardInput = clamp(MOUSE.throttle + thrustFKeys, -1, 1);
+  const gpForward = GP.connected ? GP.throttle : 0;
+  const forwardInput = clamp(MOUSE.throttle + thrustFKeys + gpForward, -1, 1);
 
   const thrustX=(keys['ArrowRight']?1:0)-(keys['ArrowLeft']?1:0);
   const thrustY=(keys['KeyR']?1:0)-(keys['KeyF']?1:0);
@@ -1071,12 +1163,21 @@ function handleInput(dt){
   ship.vel.addScaledVector(right,thrustX*ship.strafe*mult*dt);
   ship.vel.addScaledVector(up,thrustY*ship.lift*mult*dt);
 
-  if(keys['KeyZ']) ship.vel.multiplyScalar(Math.pow(1-ship.brakeCoeff,dt*60)); else ship.vel.multiplyScalar(1-ship.dampingLin*dt);
+  // Brake/damp: keyboard Z or gamepad X/Square (button 2) held
+  const dampHeld = keys['KeyZ'] || (GP.connected && GP.btns[2]);
+  if(dampHeld) ship.vel.multiplyScalar(Math.pow(1-ship.brakeCoeff,dt*60));
+  else ship.vel.multiplyScalar(1-ship.dampingLin*dt);
+
   const spd=ship.vel.length(); if(spd>ship.maxSpeed*mult) ship.vel.multiplyScalar((ship.maxSpeed*mult)/spd);
 
-  // Fire: keyboard OR mouse buttons
-  if(keys['Space'] || MOUSE.fireL) fireLaser();
-  if(keys['KeyX']  || MOUSE.fireR) fireMissile();
+  // Fire: keyboard OR mouse buttons OR gamepad (A/B)
+  if(keys['Space'] || MOUSE.fireL || (GP.connected && GP.btns[0])) fireLaser();
+  if(keys['KeyX']  || MOUSE.fireR || (GP.connected && GP.btns[1])) fireMissile();
+
+  // Options via Start
+  if(GP.connected && GP.justPressed(9)) openOptions();
+  // Cycle nav via Back/Select
+  if(GP.connected && GP.justPressed(8)) NAV.nextTarget();
 
   if(keys['KeyC'] && docked){ closeDockPanel(); }
 }
