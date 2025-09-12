@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>AstroMiner — Mouse‑Wheel Throttle Fix • Optional Music</title>
+<title>AstroMiner — Fast Build • Stable Audio • True Waypoint • Instant Lasers</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   :root{
@@ -81,7 +81,6 @@
 <div class="hud">
   <div><b>Seed:</b> <span id="uiSeed">0</span> · <b>Quality:</b> <span id="uiQual">High</span></div>
   <div style="margin-top:6px"><b>Speed:</b> <span id="uiSpd">0</span> m/s · <b>Range:</b> <span id="uiRange">0</span> m</div>
-  <div style="margin-top:6px"><b>Throttle</b><div class="bar"><span id="barThrottle"></span></div></div>
   <div style="margin-top:6px"><b>Boost</b><div class="bar"><span id="barBoost"></span></div></div>
   <div style="margin-top:6px"><b>Laser Heat</b><div class="bar"><span id="barLaser"></span></div></div>
   <div style="margin-top:6px"><b>Missile Heat</b><div class="bar red"><span id="barMiss"></span></div></div>
@@ -112,16 +111,16 @@
   <div class="row"><span class="k">Mass Driver</span><button id="unlockMass">Locked (900)</button></div>
   <div class="row"><span class="k">Gravity Gun</span><button id="unlockGrav">Locked (1500)</button></div>
   <div style="margin-top:6px;opacity:.75">
-    Shop: <b>U</b> · Quality: <b>1</b>/<b>2</b> · New Seed: <b>N</b> · Boost: <b>Shift</b> · FPS: <b>Shift+F</b> · Cycle Nav: <b>H</b> · Mouse Aim: Click in · Options: <b>O</b>/<b>Esc</b>
+    Shop: <b>U</b> · Quality: <b>1</b>/<b>2</b> · New Seed: <b>N</b> · Boost: <b>Shift</b> · FPS: <b>Shift+F</b> · Cycle Nav: <b>H</b> · Mouse Aim: Click in (Options to toggle)
   </div>
 </div>
 
 <div class="help">
   <div><b>Controls</b> — Zero‑G 6‑DOF</div>
-  <div>Pitch: <b>W/S</b> · Yaw: <b>A/D</b> · Roll: <b>Q/E</b> (or hold <b>MMB</b> + move)</div>
-  <div>Forward/Reverse: <b>↑/↓</b> + <b>Mouse‑Wheel</b> · Strafe: <b>←/→</b> · Lift: <b>R/F</b> · Boost: <b>Shift</b></div>
+  <div>Pitch: <b>W/S</b> · Yaw: <b>A/D</b> · Roll: <b>Q/E</b></div>
+  <div>Forward/Reverse: <b>↑/↓</b> · Strafe: <b>←/→</b> · Lift: <b>R/F</b> · Boost: <b>Shift</b></div>
   <div>Brake/Damp: <b>Z</b> · Laser: <b>Space</b>/<b>LMB</b> · Missile: <b>X</b>/<b>RMB</b> · Dock: <b>C</b> · Options: <b>O</b>/<b>Esc</b> · <b>Cycle Nav: H</b></div>
-  <div>Mouse Aim (optional): <b>Click the playfield</b> to capture pointer · LMB fire laser · RMB fire missile · Press <b>Esc</b> to release.</div>
+  <div>Mouse Aim (optional): <b>Click the playfield</b> to capture pointer · LMB fire laser · RMB fire missile · Press <b>Esc</b> to release. Mousewheel: throttle up/down.</div>
 </div>
 
 <!-- Reticle -->
@@ -211,7 +210,7 @@ const byId = id=>document.getElementById(id);
 const ui={
   seed:byId('uiSeed'), qual:byId('uiQual'),
   spd:byId('uiSpd'), range:byId('uiRange'),
-  barThrottle:byId('barThrottle'), barBoost:byId('barBoost'), barLaser:byId('barLaser'), barMiss:byId('barMiss'),
+  barBoost:byId('barBoost'), barLaser:byId('barLaser'), barMiss:byId('barMiss'),
   credits:byId('uiCredits'), cargo:byId('uiCargo'), cap:byId('uiCap'),
   toast:byId('toast'), err:byId('err'),
   shop:byId('shop'), dockShopMount:byId('dockShopMount'),
@@ -261,96 +260,10 @@ const Loader={
   hide(){ ui.loading.style.display='none'; }
 };
 
-/* ---------- Settings ---------- */
-const Settings = { sfx:true, music:true, mouseAim:true, fov:75, quality:'high' };
-function loadSettings(){ try{ const j=localStorage.getItem('astrominer_settings'); if(j){ Object.assign(Settings, JSON.parse(j)); } }catch{} }
-function saveSettings(){ localStorage.setItem('astrominer_settings', JSON.stringify(Settings)); }
-
-/* ---------- Audio (SFX + optional slow synthwave music) ---------- */
-const AUD={
-  _ctx:null, _gain:null,
-  init(){ try{ const C=window.AudioContext||window.webkitAudioContext; this._ctx=new C(); this._gain=this._ctx.createGain(); this._gain.gain.value=0.9; this._gain.connect(this._ctx.destination); BGM.init(this._ctx); if(Settings.music) BGM.start(); }catch(e){} },
-  ok(){ return this._ctx; },
-  sfxOn(){ return Settings.sfx && this._ctx; },
-  beep(freq=880,dur=0.05,type='sine',gain=0.03){
-    if(!this.sfxOn()) return; const t=this._ctx.currentTime;
-    const o=this._ctx.createOscillator(); const g=this._ctx.createGain();
-    o.type=type; o.frequency.setValueAtTime(freq,t);
-    g.gain.setValueAtTime(gain,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-    o.connect(g).connect(this._gain); o.start(t); o.stop(t+dur);
-  },
-  zap(){ this.beep(880,0.05,'sawtooth',0.05); this.beep(1760,0.05,'triangle',0.03); },
-  pickup(){ if(!this.sfxOn()) return; this.beep(1200,0.06,'sine',0.045); setTimeout(()=>this.beep(1600,0.05,'sine',0.035),40); },
-  boom(){
-    if(!this.sfxOn()) return; const t=this._ctx.currentTime;
-    const o=this._ctx.createOscillator(); const g=this._ctx.createGain();
-    o.type='square'; o.frequency.setValueAtTime(80,t); o.frequency.exponentialRampToValueAtTime(30,t+0.3);
-    g.gain.setValueAtTime(0.08,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.35);
-    o.connect(g).connect(this._gain); o.start(t); o.stop(t+0.35);
-  }
-};
-// super‑light, slow synth bed (A minor)
-const BGM={
-  ctx:null, gain:null, playing:false, nextT:0, tempo:74/60, // ~74 BPM
-  init(ctx){ this.ctx=ctx; this.gain=ctx.createGain(); this.gain.gain.value=0.08; this.gain.connect(ctx.destination); },
-  start(){ if(!this.ctx||this.playing) return; this.playing=true; this.nextT=this.ctx.currentTime; },
-  stop(){ this.playing=false; },
-  toggle(on){ if(on){ this.start(); } else { this.stop(); } },
-  note(freq, dur=0.45, vol=0.08, type='triangle', t=this.ctx.currentTime){
-    const o=this.ctx.createOscillator(), g=this.ctx.createGain();
-    o.type=type; o.frequency.setValueAtTime(freq, t);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(vol, t+0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
-    o.connect(g).connect(this.gain); o.start(t); o.stop(t+dur+0.05);
-  },
-  // call each frame
-  update(){
-    if(!this.playing||!this.ctx) return;
-    const now=this.ctx.currentTime;
-    const scale=[220.00, 246.94, 261.63, 293.66, 329.63, 349.23, 392.00]; // A minor-ish
-    while(this.nextT<now+0.25){
-      const step=Math.floor(this.nextT*this.tempo)%16;
-      const root = (step<8)?0:3; // A then F flavor
-      const pad  = scale[root] * (step%2?2:1);
-      this.note(pad, 0.6, 0.065,'sine', this.nextT);
-      if(step%4===0){ // gentle bass pulse
-        this.note(scale[root]/2, 0.5, 0.07,'triangle', this.nextT);
-      }
-      if(step%8===4){ // airy sparkle
-        this.note(scale[root+5]*2, 0.25, 0.045,'sawtooth', this.nextT);
-      }
-      this.nextT += (1/this.tempo)/4; // 16th‑notes
-    }
-  }
-};
-
-/* ---------- Options modal ---------- */
-function updateOptionsMirror(){
-  ui.optSfx.textContent = Settings.sfx?'On':'Off';
-  ui.optMusic.textContent = Settings.music?'On':'Off';
-  ui.optMouse.textContent = Settings.mouseAim?'On':'Off';
-  ui.optQual.textContent= (quality==='ultra')?'Ultra':'High';
-  ui.optFovVal.textContent = String(baseFov);
-}
-function unlockPointer(){ try{ if(document.pointerLockElement) document.exitPointerLock(); }catch{} }
-function openOptions(){ unlockPointer(); setPaused(true,'options'); ui.optMask.style.display='flex'; updateOptionsMirror(); }
-function closeOptions(){ ui.optMask.style.display='none'; if(pauseReason==='options'){ setPaused(false,null); if(fpsOn) ui.fps.style.display='block'; } }
-ui.optSfx.addEventListener('click',()=>{ Settings.sfx=!Settings.sfx; saveSettings(); updateOptionsMirror(); toast('SFX '+(Settings.sfx?'On':'Off')); });
-ui.optMusic.addEventListener('click',()=>{ Settings.music=!Settings.music; saveSettings(); updateOptionsMirror(); if(!AUD._ctx) AUD.init(); BGM.toggle(Settings.music); toast('Music '+(Settings.music?'On':'Off')); });
-ui.optMouse.addEventListener('click',()=>{ Settings.mouseAim=!Settings.mouseAim; if(!Settings.mouseAim){ unlockPointer(); MOUSE.fireL=false; MOUSE.fireR=false; } saveSettings(); updateOptionsMirror(); updateMouseHint(); });
-ui.optQual.addEventListener('click',()=>{ setQuality(quality==='ultra'?'high':'ultra'); updateOptionsMirror(); });
-ui.optFovDown.addEventListener('click',()=>{ baseFov=clamp(baseFov-2,60,95); Settings.fov=baseFov; camera.fov=baseFov; camera.updateProjectionMatrix(); saveSettings(); updateOptionsMirror(); });
-ui.optFovUp.addEventListener('click',()=>{ baseFov=clamp(baseFov+2,60,95); Settings.fov=baseFov; camera.fov=baseFov; camera.updateProjectionMatrix(); saveSettings(); updateOptionsMirror(); });
-byId('optClose').addEventListener('click',()=>closeOptions());
-
 /* ---------- Input & Menus ---------- */
 const keys={};
 let fpsOn=false, paused=false, pauseReason=null;
-function setPaused(p, reason=null){
-  paused=p; pauseReason=reason;
-  if(p){ ui.fps.style.display='none'; }
-}
+function setPaused(p, reason=null){ paused=p; pauseReason=reason; if(p){ ui.fps.style.display='none'; } }
 function toggleFPS(){ fpsOn=!fpsOn; if(!paused) ui.fps.style.display=fpsOn?'block':'none'; }
 
 addEventListener('keydown',e=>{
@@ -363,29 +276,124 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyU'){ ui.shop.style.display = (ui.shop.style.display==='none'?'block':'none'); }
   if(e.code==='KeyO' || e.code==='Escape'){ openOptions(); }
   if(e.code==='KeyH'){ NAV.nextTarget(); }
-  if(e.code==='PageUp'){ THROTTLE.bump(+1); }
-  if(e.code==='PageDown'){ THROTTLE.bump(-1); }
-
-  if(AUD._ctx && AUD._ctx.state==='suspended') AUD._ctx.resume();
-  if(!AUD._ctx) AUD.init();
+  AUDIO.ensure(); // make sure SFX can play even if music is off
 });
 addEventListener('keyup',e=>{ keys[e.code]=false; });
 
-/* ---------- Throttle (mouse‑wheel) ---------- */
-const THROTTLE={ val:0, target:0, step:0.08, slew:3.5, // per‑sec slew to target
-  bump(dir){ this.target = clamp(this.target + this.step*dir, -1, 1); toast('Throttle '+Math.round((this.target+1)*50)+'%'); },
-  update(dt){ this.val = THREE.MathUtils.damp(this.val, this.target, this.slew, dt); }
-};
-// Wheel up (deltaY < 0) → accelerate; Wheel down (deltaY > 0) → decelerate
-function onWheel(e){
-  // Allow zooming the page when Options modal open; otherwise prevent default scroll
-  if(ui.optMask.style.display==='flex') return;
-  e.preventDefault();
-  const dir = (e.deltaY<0) ? +1 : -1;
-  THROTTLE.bump(dir);
+/* ---------- Audio (decoupled, safe) ---------- */
+const Settings = { sfx:true, music:false, mouseAim:true, fov:75, quality:'high' };
+function loadSettings(){ try{ const j=localStorage.getItem('astrominer_settings'); if(j){ Object.assign(Settings, JSON.parse(j)); } }catch{} }
+function saveSettings(){ localStorage.setItem('astrominer_settings', JSON.stringify(Settings)); }
+
+// guards around AudioParams to avoid non-finite crashes
+function safeSet(param, value, atTime, fallback=0){
+  if(!param || !AUDIO.ctx) return;
+  const v = Number.isFinite(value) ? value : fallback;
+  const t = Number.isFinite(atTime) ? atTime : AUDIO.ctx.currentTime;
+  try{ param.setValueAtTime(v, t); }catch(e){ /* swallow noisy setValueAtTime errors */ }
 }
-renderer.domElement.addEventListener('wheel', onWheel, { passive:false });
-window.addEventListener('wheel', onWheel, { passive:false });
+function safeExp(param, value, atTime){
+  if(!param || !AUDIO.ctx) return;
+  const v = Math.max(Number.isFinite(value)?value:0.0001, 0.0001); // exp must be > 0
+  const t = Number.isFinite(atTime) ? atTime : AUDIO.ctx.currentTime+0.001;
+  try{ param.exponentialRampToValueAtTime(v, t); }catch(e){}
+}
+function midiToFreq(n){ return 440*Math.pow(2,(n-69)/12); }
+
+const AUDIO={
+  ctx:null, master:null, sfxGain:null, musicGain:null, noiseBuffer:null,
+  init(){
+    if(this.ctx) return;
+    const C=window.AudioContext||window.webkitAudioContext; if(!C) return;
+    const ctx=new C(); this.ctx=ctx;
+
+    // graph
+    this.master=ctx.createGain(); safeSet(this.master.gain, 0.9, ctx.currentTime);
+    this.sfxGain=ctx.createGain(); safeSet(this.sfxGain.gain, Settings.sfx?0.9:0, ctx.currentTime);
+    this.musicGain=ctx.createGain(); safeSet(this.musicGain.gain, Settings.music?0.7:0, ctx.currentTime);
+    this.sfxGain.connect(this.master); this.musicGain.connect(this.master); this.master.connect(ctx.destination);
+
+    // noise buffer for hats/explosions
+    const len=ctx.sampleRate*1; const buf=ctx.createBuffer(1,len,ctx.sampleRate);
+    const data=buf.getChannelData(0); for(let i=0;i<len;i++) data[i]=Math.random()*2-1; this.noiseBuffer=buf;
+
+    // if music toggle already on, start it
+    if(Settings.music) MUSIC.start();
+  },
+  ensure(){ if(!this.ctx) this.init(); if(this.ctx && this.ctx.state==='suspended') this.ctx.resume(); },
+  setSFX(on){ Settings.sfx=on; saveSettings(); this.ensure(); if(this.sfxGain) this.sfxGain.gain.setTargetAtTime(on?0.9:0, this.ctx.currentTime, 0.02); },
+  setMusic(on){ Settings.music=on; saveSettings(); this.ensure(); if(on){ MUSIC.start(); this.musicGain.gain.setTargetAtTime(0.7,this.ctx.currentTime,0.25); } else { this.musicGain.gain.setTargetAtTime(0,this.ctx.currentTime,0.25); MUSIC.stop(); } },
+  // --- SFX ---
+  beep(freq=880,dur=0.05,type='sine',gain=0.03){
+    if(!Settings.sfx) return; this.ensure(); const t=this.ctx.currentTime;
+    const o=this.ctx.createOscillator(); const g=this.ctx.createGain(); o.type=type;
+    safeSet(o.frequency,freq,t); safeSet(g.gain,gain,t); safeExp(g.gain,0.0001,t+dur);
+    o.connect(g).connect(this.sfxGain); o.start(t); o.stop(t+dur+0.02);
+  },
+  zap(){ this.beep(880,0.05,'sawtooth',0.05); this.beep(1760,0.05,'triangle',0.035); },
+  pickup(){ if(!Settings.sfx) return; this.beep(1200,0.06,'sine',0.045); setTimeout(()=>this.beep(1600,0.05,'sine',0.035),40); },
+  boom(){
+    if(!Settings.sfx) return; this.ensure(); const t=this.ctx.currentTime;
+    const o=this.ctx.createOscillator(); const g=this.ctx.createGain(); o.type='square';
+    safeSet(o.frequency,80,t); o.frequency.exponentialRampToValueAtTime(30,t+0.3);
+    safeSet(g.gain,0.08,t); safeExp(g.gain,0.0001,t+0.35);
+    o.connect(g).connect(this.sfxGain); o.start(t); o.stop(t+0.36);
+    // short noise thump
+    const n=this.ctx.createBufferSource(); n.buffer=this.noiseBuffer; const ng=this.ctx.createGain();
+    safeSet(ng.gain,0.08,t); safeExp(ng.gain,0.0001,t+0.2); n.connect(ng).connect(this.sfxGain); n.start(t); n.stop(t+0.21);
+  }
+};
+
+// lightweight “spacey synthwave” background music
+const MUSIC={
+  running:false, id:null, next:0, tempo:78, step:0,
+  start(){ if(this.running) return; AUDIO.ensure(); if(!AUDIO.ctx) return;
+    this.running=true; this.next=AUDIO.ctx.currentTime+0.05; this.step=0;
+    if(this.id) clearInterval(this.id); this.id=setInterval(()=>this.tick(), 25);
+  },
+  stop(){ if(this.id){ clearInterval(this.id); this.id=null; } this.running=false; },
+  tick(){
+    if(!this.running || !AUDIO.ctx) return;
+    const ctx=AUDIO.ctx; const beat=60/this.tempo; const look=0.12;
+    while(this.next < ctx.currentTime+look){ this.playStep(this.next); this.next+=beat; this.step=(this.step+1)%16; }
+  },
+  playStep(t){
+    // soft hat
+    if(this.step%2===0){ const n=AUDIO.ctx.createBufferSource(); n.buffer=AUDIO.noiseBuffer; const hp=AUDIO.ctx.createBiquadFilter(); hp.type='highpass'; safeSet(hp.frequency,7000,t); const g=AUDIO.ctx.createGain(); safeSet(g.gain,0.0001,t); g.gain.setTargetAtTime(0.03,t,0.006); g.gain.setTargetAtTime(0.0001,t+0.06,0.02); n.connect(hp).connect(g).connect(AUDIO.musicGain); n.start(t); n.stop(t+0.08); }
+    // bass on the one & three
+    if(this.step%4===0){ const root=[43,43,38,43][Math.floor(this.step/4)%4]; // G2–G2–D#2–G2
+      const o=AUDIO.ctx.createOscillator(); o.type='triangle'; const g=AUDIO.ctx.createGain(); safeSet(o.frequency,midiToFreq(root),t); safeSet(g.gain,0.0001,t); g.gain.setTargetAtTime(0.06,t,0.015); g.gain.setTargetAtTime(0.0001,t+0.28,0.08); o.connect(g).connect(AUDIO.musicGain); o.start(t); o.stop(t+0.6);
+    }
+    // pad every 8 steps
+    if(this.step%8===0){ const base=[43,38][(this.step/8)%2|0]; const chord=[base, base+7, base+10]; // minor 7 feel
+      for(const n of chord){ const o=AUDIO.ctx.createOscillator(); o.type='sine'; const f=AUDIO.ctx.createBiquadFilter(); f.type='lowpass'; safeSet(f.frequency,1600,t); const g=AUDIO.ctx.createGain(); safeSet(o.frequency,midiToFreq(n),t); safeSet(g.gain,0.0001,t); g.gain.setTargetAtTime(0.06,t,0.4); g.gain.setTargetAtTime(0.0001,t+3.2,0.8); o.connect(f).connect(g).connect(AUDIO.musicGain); o.start(t); o.stop(t+3.5); }
+    }
+  }
+};
+
+// start audio on ANY user gesture (fixes “SFX need music first”)
+const primeAudio = ()=>AUDIO.ensure();
+window.addEventListener('pointerdown', primeAudio, {once:true});
+window.addEventListener('keydown', primeAudio, {once:true});
+
+/* ---------- Options modal ---------- */
+function updateOptionsMirror(){
+  ui.optSfx.textContent = Settings.sfx?'On':'Off';
+  ui.optMusic.textContent = Settings.music?'On':'Off';
+  ui.optMouse.textContent = Settings.mouseAim?'On':'Off';
+  ui.optQual.textContent= (quality==='ultra')?'Ultra':'High';
+  ui.optFovVal.textContent = String(baseFov);
+}
+function unlockPointer(){ try{ if(document.pointerLockElement) document.exitPointerLock(); }catch{} }
+function openOptions(){ unlockPointer(); setPaused(true,'options'); ui.optMask.style.display='flex'; updateOptionsMirror(); }
+function closeOptions(){ ui.optMask.style.display='none'; if(pauseReason==='options'){ setPaused(false,null); if(fpsOn) ui.fps.style.display='block'; } }
+ui.optSfx.addEventListener('click',()=>{ AUDIO.setSFX(!Settings.sfx); updateOptionsMirror(); toast('SFX '+(Settings.sfx?'On':'Off')); });
+ui.optMusic.addEventListener('click',()=>{ AUDIO.setMusic(!Settings.music); updateOptionsMirror(); toast('Music '+(Settings.music?'On':'Off')); });
+ui.optMouse.addEventListener('click',()=>{ Settings.mouseAim=!Settings.mouseAim; if(!Settings.mouseAim){ unlockPointer(); MOUSE.fireL=false; MOUSE.fireR=false; } saveSettings(); updateOptionsMirror(); updateMouseHint(); });
+ui.optQual.addEventListener('click',()=>{ setQuality(quality==='ultra'?'high':'ultra'); updateOptionsMirror(); });
+ui.optFovDown.addEventListener('click',()=>{ baseFov=clamp(baseFov-2,60,95); Settings.fov=baseFov; camera.fov=baseFov; camera.updateProjectionMatrix(); saveSettings(); updateOptionsMirror(); });
+ui.optFovUp.addEventListener('click',()=>{ baseFov=clamp(baseFov+2,60,95); Settings.fov=baseFov; camera.fov=baseFov; camera.updateProjectionMatrix(); saveSettings(); updateOptionsMirror(); });
+byId('optClose').addEventListener('click',()=>closeOptions());
 
 /* ---------- Ship ---------- */
 const ship={
@@ -409,13 +417,11 @@ const eyeLocal = new THREE.Vector3(0,0,0);
 function hardpointWorld(local){ return local.clone().applyQuaternion(ship.quat).add(ship.pos); }
 
 /* ---------- Mouse aim (optional) ---------- */
-const MOUSE={yaw:0,pitch:0,fireL:false,fireR:false,sens:0.0022,locked:false,mmb:false};
+const MOUSE={yaw:0,pitch:0,fireL:false,fireR:false,sens:0.0022,locked:false};
 function updateMouseHint(){ ui.mouseHint.classList.toggle('hide', !Settings.mouseAim || MOUSE.locked || paused); }
 renderer.domElement.addEventListener('contextmenu',e=>{ e.preventDefault(); });
-renderer.domElement.addEventListener('click',()=>{
-  if(!Settings.mouseAim) return;
-  try{ renderer.domElement.requestPointerLock({unadjustedMovement:true}); }catch{ renderer.domElement.requestPointerLock?.(); }
-});
+renderer.domElement.addEventListener('click',()=>{ if(!Settings.mouseAim) return;
+  try{ renderer.domElement.requestPointerLock({unadjustedMovement:true}); }catch{ renderer.domElement.requestPointerLock?.(); } });
 document.addEventListener('pointerlockchange',()=>{
   MOUSE.locked = (document.pointerLockElement===renderer.domElement);
   renderer.domElement.style.cursor = MOUSE.locked?'none':'auto';
@@ -424,61 +430,22 @@ document.addEventListener('pointerlockchange',()=>{
 });
 renderer.domElement.addEventListener('mousemove',(e)=>{
   if(!Settings.mouseAim || !MOUSE.locked) return;
-  MOUSE.yaw   += (-e.movementX) * MOUSE.sens; // right movement → yaw right (negative sign aligns with keys mapping)
-  MOUSE.pitch += (-e.movementY) * MOUSE.sens; // up movement → pitch up
+  MOUSE.yaw   += (-e.movementX) * MOUSE.sens;
+  MOUSE.pitch += (-e.movementY) * MOUSE.sens;
 });
-function onMouseDown(e){
-  if(e.button===1) MOUSE.mmb=true;
-  if(!Settings.mouseAim) return;
-  if(e.button===0){ MOUSE.fireL=true; }
-  if(e.button===2){ MOUSE.fireR=true; }
-}
-function onMouseUp(e){
-  if(e.button===1) MOUSE.mmb=false;
-  if(e.button===0){ MOUSE.fireL=false; }
-  if(e.button===2){ MOUSE.fireR=false; }
-}
+function onMouseDown(e){ if(!Settings.mouseAim) return; if(e.button===0){ MOUSE.fireL=true; } if(e.button===2){ MOUSE.fireR=true; } }
+function onMouseUp(e){ if(e.button===0){ MOUSE.fireL=false; } if(e.button===2){ MOUSE.fireR=false; } }
 renderer.domElement.addEventListener('mousedown', onMouseDown);
 document.addEventListener('mouseup', onMouseUp);
 window.addEventListener('blur',()=>{ MOUSE.fireL=false; MOUSE.fireR=false; });
 
-/* ---------- Gamepad (left stick look; triggers/right‑Y throttle; buttons fire/dock) ---------- */
-const GP={ _last:{fireL:false,fireR:false,dock:false}, present:false };
-function updateGamepad(dt){
-  const pads = navigator.getGamepads?.(); if(!pads) return;
-  const gp = pads[0]; if(!gp) { GP.present=false; return; } GP.present=true;
-
-  const axLx = gp.axes[0]||0;  // left stick X (look yaw)
-  const axLy = gp.axes[1]||0;  // left stick Y (look pitch)
-  const axRy = gp.axes[3]||0;  // right stick Y (throttle)
-  const trL  = gp.buttons[6]?.value||0; // left trigger
-  const trR  = gp.buttons[7]?.value||0; // right trigger
-
-  // Add to mouse/keyboard look (flip sign so right stick right = yaw right)
-  MOUSE.yaw   += (-axLx) * 0.02; // fixed direction: right → yaw right
-  MOUSE.pitch += (+axLy) * 0.02;
-
-  // Throttle via right‑Y or triggers
-  const thrAxis = clamp(-axRy, -1, 1); // push up to accelerate
-  if(Math.abs(thrAxis) > 0.08){ THROTTLE.target = clamp(thrAxis, -1, 1); }
-  const trigMix = (trR - trL); // R accel, L decel
-  if(Math.abs(trigMix) > 0.05){ THROTTLE.target = clamp(trigMix, -1, 1); }
-
-  // Buttons
-  const fireL = gp.buttons[0]?.pressed || gp.buttons[5]?.pressed; // A / RB
-  const fireR = gp.buttons[1]?.pressed || gp.buttons[4]?.pressed; // B / LB
-  const dock  = gp.buttons[3]?.pressed; // Y
-
-  if(fireL && !GP._last.fireL) MOUSE.fireL = true;
-  if(!fireL) MOUSE.fireL = false;
-
-  if(fireR && !GP._last.fireR) MOUSE.fireR = true;
-  if(!fireR) MOUSE.fireR = false;
-
-  if(dock && !GP._last.dock) keys['KeyC']=true;
-
-  GP._last.fireL=fireL; GP._last.fireR=fireR; GP._last.dock=dock;
-}
+/* Mouse wheel throttle: up accelerate, down decelerate */
+renderer.domElement.addEventListener('wheel',(e)=>{
+  const amt = Math.sign(-e.deltaY); // wheel up => positive (accelerate)
+  const fwd=new THREE.Vector3(0,0,-1).applyQuaternion(ship.quat);
+  ship.vel.addScaledVector(fwd, amt * ship.thrust * 0.35);
+  e.preventDefault();
+},{passive:false});
 
 /* ---------- Upgrades & Shop ---------- */
 const upgrades={
@@ -581,7 +548,7 @@ function bindShop(){
   B.buyTarget.addEventListener('click',()=>tryBuy('target','Targeting Computer'));
 }
 
-/* ---------- Save/Load ---------- */
+/* ---------- Saving ---------- */
 const LSKEY='astrominer_save_v1';
 function save(){ localStorage.setItem(LSKEY, JSON.stringify({seed,quality,credits:ship.credits,cargo:ship.cargo,upgrades})); }
 function load(){ try{ const j=localStorage.getItem(LSKEY); if(!j) return; const d=JSON.parse(j);
@@ -589,7 +556,7 @@ function load(){ try{ const j=localStorage.getItem(LSKEY); if(!j) return; const 
   applyUpgrades();
 }catch(e){ console.warn('save load failed',e); } }
 
-/* ---------- Sky / Stars ---------- */
+/* ---------- Sky & stars ---------- */
 function finalizeGlowTexture(t){ t.anisotropy=2; t.generateMipmaps=false; t.minFilter=THREE.LinearFilter; t.magFilter=THREE.LinearFilter; t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping; t.premultiplyAlpha=true; t.colorSpace=THREE.SRGBColorSpace; t.needsUpdate=true; return t; }
 function makeGlowTexture(size=96, inner=0.0, outer=1.0, col='rgba(255,240,140,1)'){
   const c=document.createElement('canvas'); c.width=c.height=size; const x=c.getContext('2d'); x.clearRect(0,0,size,size);
@@ -602,9 +569,7 @@ async function makeStarfieldAsync(seed, count, spread=70000, progress){
     const geo=new THREE.BufferGeometry(); const pos=new Float32Array(n*3);
     for(let i=0;i<n;i++){
       const r=spr*Math.pow(R(),0.22), th=R()*Math.PI*2, u=R()*2-1, ph=Math.acos(u), s=Math.sin(ph);
-      pos[i*3]=r*s*Math.cos(th);
-      pos[i*3+1]=r*Math.cos(ph);
-      pos[i*3+2]=r*s*Math.sin(th);
+      pos[i*3]=r*s*Math.cos(th); pos[i*3+1]=r*Math.cos(ph); pos[i*3+2]=r*s*Math.sin(th);
       if((i&1023)===0){ progress && progress(`${label} ${Math.floor(i/n*100)}%`); await nextFrame(); }
     }
     const mat=new THREE.PointsMaterial({size, color:0xffffff, sizeAttenuation:true, depthWrite:false});
@@ -650,8 +615,7 @@ function buildFieldFX(startCenter,clearR){
   for(const f of FIELDS){
     for(let i=0;i<2;i++){
       const s=new THREE.Sprite(new THREE.SpriteMaterial({map:dustTex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.18}));
-      let pos;
-      let tries=0;
+      let pos; let tries=0;
       do{
         pos=f.center.clone().add(new THREE.Vector3((Math.random()-0.5)*400,(Math.random()-0.5)*150,(Math.random()-0.5)*400));
         tries++;
@@ -707,11 +671,12 @@ async function buildAsteroidsAsync(seed, progress){
   const basePerField = (quality==='ultra')?850:650;
   const baseCount = basePerField * fields;
 
-  // Very few crystals; metals rare; rocks dominant
+  // VERY few crystals; metals rare; rocks dominant
   const frac = { rock:0.90, crystal:0.06, metal:0.03, giants:0.01 };
   const counts={ rock:Math.floor(baseCount*frac.rock), crystal:Math.floor(baseCount*frac.crystal), metal:Math.floor(baseCount*frac.metal), giants:Math.floor(baseCount*frac.giants) };
   const extraCluster = Math.floor(baseCount*0.08); // rock-only clusters
 
+  // Field centers: one at origin (start field), others on ring
   const ringR = (quality==='ultra')?8000:6500;
 
   // Big safe bubble at spawn for free turning
@@ -864,7 +829,7 @@ function spawnExplosion(pos,scale){
   const g=new THREE.SphereGeometry(1,10,8), m=new THREE.MeshBasicMaterial({color:0xffaa55,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false});
   const s=new THREE.Mesh(g,m); s.position.copy(pos); s.scale.setScalar(0.5); s.userData.t=0; s.userData.life=0.4; s.userData.scale=scale*0.08+0.6; FX.group.add(s);
   const dist=pos.distanceTo(ship.pos); const pct=THREE.MathUtils.clamp(1-dist/1000,0,1);
-  if(pct>0){ addShake(0.6*pct, 0.25+0.2*pct); AUD.boom(); screenFlash(0.12*pct); triggerKick(1.2*pct); }
+  if(pct>0){ addShake(0.6*pct, 0.25+0.2*pct); AUDIO.boom(); screenFlash(0.12*pct); triggerKick(1.2*pct); }
 }
 function createLaserBeam(start,end){
   const dir=end.clone().sub(start), len=Math.max(0.001,dir.length()), dirN=dir.clone().normalize();
@@ -879,7 +844,10 @@ function createLaserBeam(start,end){
   const startSprite=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexBlue,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:0.95}));
   const endSprite  =new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexBlue,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:0.95}));
   startSprite.scale.set(7,7,1); endSprite.scale.set(9,9,1); scene.add(core,glow,startSprite,endSprite);
-  return {start:start.clone(),dir:dirN,len,mesh:core,outer:glow,startGlow:startSprite,endGlow:endSprite,t:0,life:0.22,growTime:0.06};
+  const b={start:start.clone(),dir:dirN,len,mesh:core,outer:glow,startGlow:startSprite,endGlow:endSprite,t:0,life:0.22,growTime:0.06};
+  // prime once so first frame is visible (fixes "no laser until moving")
+  updateBeam(b, b.growTime + 0.001);
+  return b;
 }
 function updateBeam(b,dt){
   b.t+=dt; const p=Math.min(1,b.t/b.growTime), L=b.len*p, mid=b.start.clone().addScaledVector(b.dir,L*0.5);
@@ -901,8 +869,9 @@ function fireLaser(){
   L._cd=1/Math.max(3,ship.laser.rof);
   const {origin,dir}=getReticleRay(); const pick=rayHitAsteroids(origin,dir,ship.range); const endPoint=pick.point.clone();
   const startL=hardpointWorld(HP_LOCAL.laserL), startR=hardpointWorld(HP_LOCAL.laserR);
-  LASER_BEAMS.push(createLaserBeam(startL,endPoint)); LASER_BEAMS.push(createLaserBeam(startR,endPoint));
-  triggerKick(1.1); screenFlash(0.08); AUD.zap();
+  const b1=createLaserBeam(startL,endPoint), b2=createLaserBeam(startR,endPoint);
+  LASER_BEAMS.push(b1); LASER_BEAMS.push(b2);
+  triggerKick(1.1); screenFlash(0.08); AUDIO.zap();
   if(pick.hit){ pick.rock.hp-=ship.laser.dmg; maybeChipLoot(endPoint); if(pick.rock.hp<=0) destroyAsteroid(pick.rock); }
 }
 function fireMissile(){
@@ -931,7 +900,7 @@ function rayHitAsteroids(origin,dir,maxRange){
   return {hit:false,t:maxRange,rock:null,point:origin.clone().addScaledVector(dir,maxRange)};
 }
 
-/* ---------- Station ---------- */
+/* ---------- Station (near) ---------- */
 const STATION={ group:null, pos:new THREE.Vector3(0,0,-11000), arm:null };
 function buildStation(){
   if(STATION.group){ scene.remove(STATION.group); }
@@ -1011,8 +980,6 @@ function updateUI(){
   ui.barBoost.style.width = clamp((ship.boost.val/ship.boost.cap)*100,0,100)+'%';
   ui.barLaser.classList.toggle('warn', ship.laser.heat>85);
   ui.barMiss.classList.toggle('warn', ship.missile.heat>85);
-  // Throttle: map -1..+1 to 0..100
-  ui.barThrottle.style.width = clamp(((THROTTLE.val+1)*50),0,100)+'%';
   refreshShop();
 }
 
@@ -1040,7 +1007,7 @@ function showTarget(rock){
   ui.tgtHud.textContent = `${rock.type||'asteroid'} · ${Math.max(0,rock.hp|0)} HP · ${camera.position.distanceTo(pos).toFixed(0)} m`;
 }
 
-/* ---------- Nav (edge clamp + smoothing + cycle) ---------- */
+/* ---------- Nav (front‑on position, else edge clamp; smoothed) ---------- */
 const NAV={ px:innerWidth/2, py:40, targetIdx:0,
   currentPos(){ if(this.targetIdx===0) return STATION.pos; const f=FIELDS[this.targetIdx-1]; return f?f.center:STATION.pos; },
   currentName(){ return this.targetIdx===0?'STATION':('FIELD '+String.fromCharCode(65+this.targetIdx-1)); },
@@ -1050,18 +1017,27 @@ function updateNavHUD(worldPos,dt){
   const w=innerWidth, h=innerHeight, pad=22;
   const padNdcX = pad/(w*0.5), padNdcY = pad/(h*0.5);
 
-  const cp = worldPos.clone().applyMatrix4(camera.matrixWorldInverse);
-  const behind = cp.z > 0;
-  let v = worldPos.clone().project(camera);
-  if(behind){ v.x = -v.x; v.y = -v.y; }
+  const v = worldPos.clone().project(camera); // NDC
+  const view = worldPos.clone().applyMatrix4(camera.matrixWorldInverse);
+  const behind = view.z > 0; // camera looks down -Z
 
-  const m = Math.max(Math.abs(v.x), Math.abs(v.y), 1e-6);
-  v.x /= m; v.y /= m;
-  v.x = clamp(v.x, -1+padNdcX, 1-padNdcX);
-  v.y = clamp(v.y, -1+padNdcY, 1-padNdcY);
+  let targetX, targetY;
 
-  const targetX = (v.x*0.5+0.5)*w;
-  const targetY = (-v.y*0.5+0.5)*h;
+  // If in front and inside the frustum -> use true position
+  if(!behind && v.x>=-1 && v.x<=1 && v.y>=-1 && v.y<=1){
+    targetX = (v.x*0.5+0.5)*w;
+    targetY = (-v.y*0.5+0.5)*h;
+  } else {
+    // Otherwise clamp to edge smoothly
+    let vx=v.x, vy=v.y;
+    if(behind){ vx=-vx; vy=-vy; } // flip when behind
+    const m = Math.max(Math.abs(vx), Math.abs(vy), 1e-6);
+    vx/=m; vy/=m;
+    vx = clamp(vx, -1+padNdcX, 1-padNdcX);
+    vy = clamp(vy, -1+padNdcY, 1-padNdcY);
+    targetX = (vx*0.5+0.5)*w;
+    targetY = (-vy*0.5+0.5)*h;
+  }
 
   const alpha = 1 - Math.pow(0.001, dt*60*0.9);
   NAV.px = lerp(NAV.px, targetX, alpha);
@@ -1108,23 +1084,15 @@ function updateFPS(dt){ if(!fpsOn || paused) return; fpsAccum+=dt; fpsFrames++; 
 function handleInput(dt){
   if(paused) return;
 
-  // Read gamepad (adds to mouse deltas and throttle target)
-  updateGamepad(dt);
-
   // Keyboard yaw/pitch/roll
   let yaw=((keys['KeyA']?1:0)-(keys['KeyD']?1:0))*ship.yawRate*dt;
   let pitch=((keys['KeyW']?1:0)-(keys['KeyS']?1:0))*ship.pitchRate*dt;
-  let roll=((keys['KeyQ']?1:0)-(keys['KeyE']?1:0))*ship.rollRate*dt;
+  const roll=((keys['KeyQ']?1:0)-(keys['KeyE']?1:0))*ship.rollRate*dt;
 
   // Mouse contributions
   if(Settings.mouseAim && MOUSE.locked){
-    if(MOUSE.mmb){
-      // Middle mouse held → roll from horizontal motion
-      roll += (-MOUSE.yaw) * ship.rollRate * 0.7;
-    }else{
-      yaw   += MOUSE.yaw;
-      pitch += MOUSE.pitch;
-    }
+    yaw   += MOUSE.yaw;
+    pitch += MOUSE.pitch;
     MOUSE.yaw=0; MOUSE.pitch=0;
   }
 
@@ -1141,29 +1109,23 @@ function handleInput(dt){
   const thrustX=(keys['ArrowRight']?1:0)-(keys['ArrowLeft']?1:0);
   const thrustY=(keys['KeyR']?1:0)-(keys['KeyF']?1:0);
 
-  // Update wheel throttle smoothing
-  THROTTLE.update(dt);
-
   const boosting = (keys['ShiftLeft']||keys['ShiftRight']) && (ship.boost.val>0.01);
   const mult = boosting ? ship.boost.mult : 1.0;
   if(boosting){ ship.boost.val = Math.max(0, ship.boost.val - dt); triggerKick(0.3); }
   else { ship.boost.val = Math.min(ship.boost.cap, ship.boost.val + ship.boost.regen*dt); }
 
-  // Combine forward input: Arrow keys + wheel throttle, clamped
-  const fwdIn = clamp(thrustF + THROTTLE.val, -1, 1);
-
-  ship.vel.addScaledVector(fwd, fwdIn*ship.thrust*mult*dt);
+  ship.vel.addScaledVector(fwd,thrustF*ship.thrust*mult*dt);
   ship.vel.addScaledVector(right,thrustX*ship.strafe*mult*dt);
   ship.vel.addScaledVector(up,thrustY*ship.lift*mult*dt);
 
   if(keys['KeyZ']) ship.vel.multiplyScalar(Math.pow(1-ship.brakeCoeff,dt*60)); else ship.vel.multiplyScalar(1-ship.dampingLin*dt);
   const spd=ship.vel.length(); if(spd>ship.maxSpeed*mult) ship.vel.multiplyScalar((ship.maxSpeed*mult)/spd);
 
-  // Fire: keyboard OR mouse / gamepad buttons
+  // Fire: keyboard OR mouse buttons
   if(keys['Space'] || MOUSE.fireL) fireLaser();
   if(keys['KeyX']  || MOUSE.fireR) fireMissile();
 
-  if(keys['KeyC'] && docked){ closeDockPanel(); keys['KeyC']=false; }
+  if(keys['KeyC'] && docked){ closeDockPanel(); }
 }
 
 function updateMissiles(dt){
@@ -1190,7 +1152,7 @@ function updateDrops(dt){
     const magnetBase = 30 + (upgrades.magnet-1)*12;
     const range = magnetBase + d.scale*5.0; if(dist<range){ d.vel.add(toShip.normalize().multiplyScalar(((magnetBase*1.4)+d.scale)*dt)); }
     const pickupR = 6 + d.scale*0.6; if(dist<pickupR){
-      d.alive=false; ship.credits+=d.value; ship.cargo=Math.min(ship.cargoCap,ship.cargo+1); toast('+'+d.value+' cr'); AUD.pickup();
+      d.alive=false; ship.credits+=d.value; ship.cargo=Math.min(ship.cargoCap,ship.cargo+1); toast('+'+d.value+' cr'); AUDIO.pickup();
       const mtx=new THREE.Matrix4().compose(new THREE.Vector3(999999,999999,999999),new THREE.Quaternion(),new THREE.Vector3(0.0001,0.0001,0.0001));
       DROPS.inst.setMatrixAt(i,mtx); DROPS.inst.instanceMatrix.needsUpdate=true; if(d.flare){ scene.remove(d.flare); d.flare.material.dispose(); }
       updateUI(); save();
@@ -1212,8 +1174,6 @@ function updateFX(dt){
 
 function loop(){
   const dt=Math.min(0.033,clock.getDelta());
-  if(AUD._ctx){ BGM.update(); }
-
   handleInput(dt);
 
   if(!paused){
@@ -1270,7 +1230,6 @@ async function buildWorldAsync(s){
 
   ship.laser.heat=0; ship.laser.over=false; ship.laser._cd=0; ship.missile.heat=0; ship.missile.over=false; ship.missile._cd=0;
   ship.boost.val = ship.boost.cap;
-  THROTTLE.val = 0; THROTTLE.target = 0;
 
   NAV.targetIdx = 0; ui.navName.textContent = NAV.currentName();
 
