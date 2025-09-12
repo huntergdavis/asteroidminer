@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>AstroMiner — Fast Baseline • Mouse Wheel Throttle + MMB Roll</title>
+<title>AstroMiner — Laser Fix • Correct Waypoint • Mouse Wheel Throttle + MMB Roll</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   :root{
@@ -120,7 +120,7 @@
   <div>Pitch: <b>W/S</b> · Yaw: <b>A/D</b> · Roll: <b>Q/E</b> or <b>Hold MMB</b> + move left/right</div>
   <div>Forward/Reverse: <b>↑/↓</b> or <b>Mouse Wheel</b> · Strafe: <b>←/→</b> · Lift: <b>R/F</b> · Boost: <b>Shift</b></div>
   <div>Brake/Damp: <b>Z</b> · Laser: <b>Space</b>/<b>LMB</b> · Missile: <b>X</b>/<b>RMB</b> · Dock: <b>C</b> · Options: <b>O</b>/<b>Esc</b> · <b>Cycle Nav: H</b></div>
-  <div>Mouse Aim (optional): <b>Click the playfield</b> to capture pointer · LMB fire laser · RMB fire missile · Press <b>Esc</b> to release.</div>
+  <div>Mouse Aim (optional): <b>Click the playfield</b> to capture pointer · LMB fire laser · RMB fire missile · <b>MMB: Roll</b> · Wheel: Throttle · Esc to release.</div>
 </div>
 
 <!-- Reticle -->
@@ -753,7 +753,7 @@ function destroyAsteroid(rec){
   addDropsOnDestroy(rec); spawnExplosion(new THREE.Vector3(rec.x,rec.y,rec.z),rec.size);
 }
 
-/* ---------- FX & Weapons (depthTest ON to avoid full-screen overdraw) ---------- */
+/* ---------- FX & Weapons (laser visibility hardened) ---------- */
 const FX={ group:new THREE.Group() }; scene.add(FX.group);
 function makeBeamGlow(size=96,inner=0,outer=1,col='rgba(130,200,255,1)'){
   const c=document.createElement('canvas'); c.width=c.height=size; const x=c.getContext('2d'); x.clearRect(0,0,size,size);
@@ -781,7 +781,12 @@ function createLaserBeam(start,end){
   core.quaternion.copy(q); glow.quaternion.copy(q);
   const startSprite=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexBlue,transparent:true,depthWrite:false,depthTest:true,blending:THREE.AdditiveBlending,opacity:0.95}));
   const endSprite  =new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexBlue,transparent:true,depthWrite:false,depthTest:true,blending:THREE.AdditiveBlending,opacity:0.95}));
-  startSprite.scale.set(7,7,1); endSprite.scale.set(9,9,1); scene.add(core,glow,startSprite,endSprite);
+  startSprite.scale.set(7,7,1); endSprite.scale.set(9,9,1);
+  // Harden against culling / ordering edge cases:
+  core.frustumCulled = glow.frustumCulled = false;
+  startSprite.frustumCulled = endSprite.frustumCulled = false;
+  core.renderOrder = glow.renderOrder = startSprite.renderOrder = endSprite.renderOrder = 5;
+  scene.add(core,glow,startSprite,endSprite);
   return {start:start.clone(),dir:dirN,len,mesh:core,outer:glow,startGlow:startSprite,endGlow:endSprite,t:0,life:0.22,growTime:0.06};
 }
 function updateBeam(b,dt){
@@ -802,9 +807,14 @@ function screenFlash(a){ flashAmt=Math.min(1, flashAmt+a); }
 function fireLaser(){
   const L=ship.laser; if(L.over||L._cd>0) return; L.heat+=L.shotHeat; if(L.heat>=100){ L.over=true; toast('Laser overheated!'); }
   L._cd=1/Math.max(3,ship.laser.rof);
-  const {origin,dir}=getReticleRay(); const pick=rayHitAsteroids(origin,dir,ship.range); const endPoint=pick.point.clone();
-  const startL=hardpointWorld(HP_LOCAL.laserL), startR=hardpointWorld(HP_LOCAL.laserR);
+
+  // Compute a tiny forward offset so beams never start exactly on the near plane
+  const {origin,dir}=getReticleRay(); const startOffset = dir.clone().multiplyScalar(0.25);
+  const pick=rayHitAsteroids(origin,dir,ship.range); const endPoint=pick.point.clone();
+  const startL=hardpointWorld(HP_LOCAL.laserL).add(startOffset);
+  const startR=hardpointWorld(HP_LOCAL.laserR).add(startOffset);
   LASER_BEAMS.push(createLaserBeam(startL,endPoint)); LASER_BEAMS.push(createLaserBeam(startR,endPoint));
+
   triggerKick(1.1); screenFlash(0.08); AUD.zap();
   if(pick.hit){ pick.rock.hp-=ship.laser.dmg; maybeChipLoot(endPoint); if(pick.rock.hp<=0) destroyAsteroid(pick.rock); }
 }
@@ -941,34 +951,48 @@ function showTarget(rock){
   ui.tgtHud.textContent = `${rock.type||'asteroid'} · ${Math.max(0,rock.hp|0)} HP · ${camera.position.distanceTo(pos).toFixed(0)} m`;
 }
 
-/* ---------- Nav (edge clamp + smoothing + cycle) ---------- */
+/* ---------- Nav (robust in-front / off-screen handling) ---------- */
 const NAV={ px:innerWidth/2, py:40, targetIdx:0,
   currentPos(){ if(this.targetIdx===0) return STATION.pos; const f=FIELDS[this.targetIdx-1]; return f?f.center:STATION.pos; },
   currentName(){ return this.targetIdx===0?'STATION':('FIELD '+String.fromCharCode(65+this.targetIdx-1)); },
   nextTarget(){ const max=1+FIELDS.length; this.targetIdx=(this.targetIdx+1)%max; toast('Nav → '+this.currentName()); },
 };
 function updateNavHUD(worldPos,dt){
+  // Ensure camera matrices are current before projecting
+  camera.updateMatrixWorld(true);
+
   const w=innerWidth, h=innerHeight, pad=22;
   const padNdcX = pad/(w*0.5), padNdcY = pad/(h*0.5);
 
-  const cp = worldPos.clone().applyMatrix4(camera.matrixWorldInverse);
-  const behind = cp.z > 0;
+  // In-front test using camera forward vector (doesn't depend on matrixWorldInverse timing)
+  const forward=new THREE.Vector3(); camera.getWorldDirection(forward); // points toward -Z
+  const toTarget = worldPos.clone().sub(camera.position);
+  const inFront = toTarget.dot(forward) > 0;
+
+  // NDC projection
   let v = worldPos.clone().project(camera);
-  if(behind){ v.x = -v.x; v.y = -v.y; }
+  let x = v.x, y = v.y;
+  let mode = 'onscreen';
 
-  const m = Math.max(Math.abs(v.x), Math.abs(v.y), 1e-6);
-  v.x /= m; v.y /= m;
-  v.x = clamp(v.x, -1+padNdcX, 1-padNdcX);
-  v.y = clamp(v.y, -1+padNdcY, 1-padNdcY);
+  // If behind or outside the frustum, clamp to edge
+  if(!inFront || x < -1 || x > 1 || y < -1 || y > 1){
+    mode = 'edge';
+    if(!inFront){ x = -x; y = -y; } // mirror when behind for stable arrow
+    const m = Math.max(Math.abs(x), Math.abs(y), 1e-6);
+    x /= m; y /= m; // bring to unit square edge
+    x = clamp(x, -1+padNdcX, 1-padNdcX);
+    y = clamp(y, -1+padNdcY, 1-padNdcY);
+  }
 
-  const targetX = (v.x*0.5+0.5)*w;
-  const targetY = (-v.y*0.5+0.5)*h;
+  const targetX = (x*0.5+0.5)*w;
+  const targetY = (-y*0.5+0.5)*h;
 
-  const alpha = 1 - Math.pow(0.001, dt*60*0.9);
+  // Gentle smoothing to avoid jitter but still responsive when on-screen
+  const alpha = mode==='edge' ? (1 - Math.pow(0.001, dt*60*0.9)) : (1 - Math.pow(0.001, dt*60*0.6));
   NAV.px = lerp(NAV.px, targetX, alpha);
   NAV.py = lerp(NAV.py, targetY, alpha);
 
-  const dist = ship.pos.distanceTo(worldPos);
+  const dist = toTarget.length();
   if(docked || dist<80){ ui.nav.style.display='none'; return; }
 
   ui.nav.style.display='flex';
