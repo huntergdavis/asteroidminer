@@ -429,7 +429,6 @@ const GP={
     let lt = (b[6]?.value!=null)? b[6].value : 0;
     let rt = (b[7]?.value!=null)? b[7].value : 0;
     if(lt===0 && rt===0 && ax.length>=6){
-      // Some browsers expose triggers on axes 4/5 as [-1..1]
       const a4 = ax[4], a5=ax[5];
       if(typeof a4==='number' && typeof a5==='number'){
         lt = (a4+1)/2; rt=(a5+1)/2;
@@ -440,7 +439,7 @@ const GP={
     this.throttle = (Math.abs(trigThrottle)>0.05) ? trigThrottle : (Math.abs(stickThrottle)>0.05 ? stickThrottle : 0);
 
     // Look on left stick (and D-pad)
-    this.yawAxis   = lx;
+    this.yawAxis   = -lx;                            // FIX: invert so right turns right
     const lyAdj    = Settings.gpInvert ? ly : -ly;
     this.pitchAxis = lyAdj;
 
@@ -449,8 +448,8 @@ const GP={
     const rollButtons = (rb? 1:0) - (lb? 1:0);
     this.rollAxis = rollButtons + rx*0.65;
 
-    // D-pad nudges
-    this.dpadYaw   = (dRight?1:0) - (dLeft?1:0);
+    // D-pad nudges (inverted to match yaw)
+    this.dpadYaw   = (dLeft?1:0) - (dRight?1:0);     // FIX: invert
     this.dpadPitch = (dUp?1:0) - (dDown?1:0);
 
     // Buttons edge detection
@@ -968,7 +967,6 @@ function updateStation(dt){
     if(dist<180){
       if(!dockPrompt){ toast('Press C or Y (gamepad) to Dock'); dockPrompt=true; }
       if(keys['KeyC']) openDockPanel();
-      // Gamepad dock/undock on Y
       if(GP.connected && GP.justPressed(3)) openDockPanel();
     } else dockPrompt=false;
   } else {
