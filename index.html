@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>AstroMiner — Warm Loader • Gamepad+Boost • Alive Sectors</title>
+<title>AstroMiner — Laser Init Fix • Fast Magnet Pull</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   :root{ --ret: rgba(173,216,255,.9); --retGlow: rgba(120,180,255,.55); --retGlow2: rgba(120,180,255,.35); --retScale: 1; }
@@ -26,7 +26,7 @@
   .toast{position:absolute;left:50%;transform:translateX(-50%);top:10px;background:rgba(0,0,0,.5);padding:6px 10px;border-radius:10px;font-size:12px;display:none;z-index:10}
   .err{position:absolute;right:10px;bottom:10px;background:#300;color:#fee;padding:8px 10px;border-radius:10px;max-width:60ch;display:none;white-space:pre-wrap;z-index:10}
 
-  /* Onscreen reticle (pixel-snapped) */
+  /* Reticle */
   .ret{position:absolute;left:50%;top:50%;transform:translate(calc(-50% + 0px),calc(-50% + 0px)) translateZ(0) scale(var(--retScale));pointer-events:none;opacity:.9;z-index:4}
   .ret .ring{width:48px;height:48px;border:2px solid var(--ret);border-radius:50%;box-shadow:0 0 18px var(--retGlow) inset,0 0 22px var(--retGlow2)}
   .ret .lines{position:absolute;left:0;top:0;width:48px;height:48px}
@@ -38,14 +38,13 @@
     radial-gradient(ellipse at center, rgba(255,255,255,.14), rgba(0,0,0,0) 60%);z-index:3}
 
   .fps{position:absolute;right:10px;bottom:10px;background:rgba(0,0,0,.55);padding:8px 10px;border-radius:10px;font:12px/1.2 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:none;z-index:6}
-
   .tgtHud{position:absolute;left:50%;top:50%;transform:translate(-50%,calc(-50% + 44px));font-size:12px;opacity:.9;background:rgba(0,0,0,.35);padding:4px 6px;border-radius:6px;z-index:5;pointer-events:none;display:none}
 
   .nav{position:absolute;left:50%;top:20px;transform:translate(-50%,0);display:none;align-items:center;gap:6px;background:rgba(0,0,0,.35);padding:4px 6px;border-radius:8px;font-size:12px;z-index:6;pointer-events:none}
   .navArrow{width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:12px solid #7fffd4;transform-origin:50% 60%;}
   .navLbl{opacity:.9}
 
-  /* Loading overlay (multi‑phase warmup) */
+  /* Loading overlay */
   .loading{position:fixed;inset:0;background:radial-gradient(ellipse at center,#0a0f1a 10%,#000 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#cfe6ff;z-index:20}
   .spinner{width:44px;height:44px;border-radius:50%;border:4px solid rgba(120,180,255,.25);border-top-color:#7fb2ff;animation:spin 0.9s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -60,7 +59,6 @@
   .btn{background:#1f3b8f;border:0;color:#fff;padding:6px 10px;border-radius:8px;cursor:pointer}
   .btn.sec{background:#2a394f}
   .muted{opacity:.75}
-
   .dockLayout{display:grid;grid-template-columns:1fr minmax(280px,420px);gap:14px}
   .dockStats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:8px 0 10px 0;font-size:12px}
   .statBox{background:#0b1220;border:1px solid #1b2a46;border-radius:8px;padding:6px}
@@ -68,7 +66,6 @@
   .hint{position:absolute;left:50%;top:50%;transform:translate(-50%,-70px);background:rgba(0,0,0,.5);padding:8px 10px;border-radius:10px;font-size:12px;z-index:6;pointer-events:none}
   .hint.hide{display:none}
 
-  /* Photo Mode */
   body.photo .hud,
   body.photo .shop,
   body.photo .help,
@@ -112,7 +109,7 @@
   <div class="row"><span class="k">Mass Driver</span><button id="unlockMass">Locked (900)</button></div>
   <div class="row"><span class="k">Gravity Gun</span><button id="unlockGrav">Locked (1500)</button></div>
   <div style="margin-top:6px;opacity:.75">
-    Shop: <b>U</b> / Back · Options: <b>O</b>/<b>Esc</b> / Start · Quality: <b>1</b>/<b>2</b> / D‑Pad ◄► · Seed: <b>N</b> · Boost: <b>Shift</b> / LB · FPS: <b>Shift+F</b> · Nav: <b>H</b> / D‑Pad ▲ · Photo: <b>P</b>
+    Shop: <b>U</b> / Options: <b>O</b>/<b>Esc</b> · Quality: <b>1</b>/<b>2</b> · Seed: <b>N</b> · Boost: <b>Shift</b> / LB · FPS: <b>Shift+F</b> · Nav: <b>H</b> / D‑Pad ▲ · Photo: <b>P</b>
   </div>
 </div>
 
@@ -126,7 +123,6 @@
 
 <div class="ret"><div class="ring"></div><div class="lines"></div></div>
 <div class="tgtHud" id="tgtHud">—</div>
-
 <div class="nav" id="nav"><div class="navArrow" id="navArrow"></div><div class="navLbl"><span id="navName">STATION</span> <span id="navDist">—</span> m</div></div>
 
 <div class="flash" id="flash"></div>
@@ -292,8 +288,7 @@ const MUSIC={
     if(!this.ok()||this._playing) return; const t=this._ctx.currentTime; this._master.gain.setValueAtTime(0.0001,t);
     const pad=this._ctx.createOscillator(); pad.type='sawtooth'; const gPad=this._ctx.createGain(); gPad.gain.value=0.0; pad.connect(gPad).connect(this._master);
     const bass=this._ctx.createOscillator(); bass.type='triangle'; const gBass=this._ctx.createGain(); gBass.gain.value=0.0; bass.connect(gBass).connect(this._master);
-    pad.frequency.setValueAtTime(220,t); bass.frequency.setValueAtTime(110,t);
-    pad.start(t); bass.start(t);
+    pad.frequency.setValueAtTime(220,t); bass.frequency.setValueAtTime(110,t); pad.start(t); bass.start(t);
     const safe=v=>Math.max(0.0001, Number.isFinite(v)?v:0.0001);
     for(let i=0;i<16;i++){ const tt=t+i*3.2;
       gPad.gain.linearRampToValueAtTime(safe(0.08+0.02*Math.sin(i)), tt+1.6);
@@ -400,7 +395,7 @@ renderer.domElement.addEventListener('wheel',(e)=>{
   e.preventDefault();
 },{passive:false});
 
-/* ---------- Gamepad (full mapping, with pointer capture via L3/R3/Start) ---------- */
+/* ---------- Gamepad (full mapping) ---------- */
 let gamepadIdx=null;
 const PAD={prev:new Array(18).fill(false), fireL:false, fireR:false, boost:false, brake:false};
 function tryPointerLockFromPad(){
@@ -429,20 +424,15 @@ function pollGamepad(){
   PAD.strafeX = (dRight?1:0)-(dLeft?1:0);
   PAD.liftDigital = (dUp?1:0)-(dDown?1:0);
 
-  // Fire & actions (stateless)
   PAD.fireL = B(0); // A
   PAD.fireR = B(1); // B
   PAD.brake = B(5) || B(2); // RB or X
   PAD.boost = B(4); // LB
 
-  // Extras
-  if(B(3)&&!PAD.prev[3]) keys['KeyC']=true;      // Y → Dock attempt
-  else keys['KeyC']=false;
+  if(B(3)&&!PAD.prev[3]) keys['KeyC']=true; else keys['KeyC']=false; // Y: Dock
   if(B(8)&&!PAD.prev[8]) ui.shop.style.display = (ui.shop.style.display==='none'?'block':'none'); // Back → Shop
   if(B(9)&&!PAD.prev[9]) openOptions();          // Start → Options
   if(B(12)&&!PAD.prev[12]) NAV.nextTarget();     // D‑pad Up → Nav
-  if(B(14)&&!PAD.prev[14]) {/* quality left */ setQuality('high'); }
-  if(B(15)&&!PAD.prev[15]) {/* quality right*/ setQuality('ultra'); }
 
   for(let i=0;i<PAD.prev.length&&i<p.buttons.length;i++) PAD.prev[i]=B(i);
 }
@@ -620,7 +610,7 @@ function buildFieldFX(startCenter,clearR){
   }
 }
 
-/* Procedural rocks */
+/* Procedural rocks (as before) */
 function hash3(x,y,z){ return (Math.sin(x*127.1 + y*311.7 + z*74.7)*43758.5453)%1; }
 function fbm3(x,y,z,oct=3){ let a=0, amp=1, freq=1; for(let i=0;i<oct;i++){ a+= (hash3(x*freq,y*freq,z*freq)*2-1)*amp; freq*=2.07; amp*=0.55; } return a; }
 function geoRock(seed,scale=1){ const g=new THREE.IcosahedronGeometry(scale,1),pos=g.attributes.position;
@@ -637,20 +627,6 @@ function geoMetal(seed,scale=1){ const g=new THREE.IcosahedronGeometry(scale,1),
     const d=fbm3(v.x*0.6+seed*0.001,v.y*0.6-seed*0.002,v.z*0.6+seed*0.003,3); v.addScaledVector(n,(d*0.18)+(Math.random()-0.5)*0.04); pos.setXYZ(i,v.x,v.y,v.z); }
   g.computeVertexNormals(); return g;
 }
-function makeMatRock(){ const m=new THREE.MeshStandardMaterial({color:0x8a929c, roughness:0.97, metalness:0.03, vertexColors:true, flatShading:true});
-  m.onBeforeCompile=(s)=>{ s.fragmentShader = s.fragmentShader.replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
-    float fres = pow(1.0 - saturate(dot(normalize(normal), normalize(vViewPosition))), 3.0);
-    #ifdef USE_COLOR
-      totalEmissiveRadiance += vec3(0.10) * fres * (0.6 + 0.4*length(vColor));
-    #else
-      totalEmissiveRadiance += vec3(0.10) * fres;
-    #endif` ); }; return m; }
-function makeMatCrystal(){ const m=new THREE.MeshStandardMaterial({color:0x8bd7ff, roughness:0.18, metalness:0.0, emissive:new THREE.Color(0x206080), emissiveIntensity:0.25, vertexColors:true, flatShading:true});
-  m.onBeforeCompile=(s)=>{ s.fragmentShader = s.fragmentShader.replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
-    float fres = pow(1.0 - saturate(dot(normalize(normal), normalize(vViewPosition))), 2.5);
-    totalEmissiveRadiance += vec3(0.20,0.55,0.65) * fres;` ); }; return m; }
-function makeMatMetal(){ return new THREE.MeshStandardMaterial({color:0x6f7885, roughness:0.60, metalness:0.95, vertexColors:true, flatShading:true}); }
-
 async function buildAsteroidsAsync(seed, progress){
   AST.inst.forEach(im=>{ scene.remove(im); im.geometry.dispose(); im.material.dispose(); });
   AST.inst=[]; AST.data=[]; AST.count=0; FIELDS=[];
@@ -781,27 +757,36 @@ function addDropsOnDestroy(a){
 /* ---------- FX & Weapons ---------- */
 const FX={ group:new THREE.Group() }; scene.add(FX.group);
 function spawnExplosion(pos,scale){
-  const g=new THREE.SphereGeometry(1,10,8), m=new THREE.MeshBasicMaterial({color:0xffaa55,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false});
-  const s=new THREE.Mesh(g,m); s.position.copy(pos); s.scale.setScalar(0.5); s.userData.t=0; s.userData.life=0.4; s.userData.scale=scale*0.08+0.6; FX.group.add(s);
+  const g=new THREE.SphereGeometry(1,10,8), m=new THREE.MeshBasicMaterial({color:0xffaa55,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false});
+  const s=new THREE.Mesh(g,m); s.position.copy(pos); s.scale.setScalar(0.5); s.userData.t=0; s.userData.life=0.4; s.userData.scale=scale*0.08+0.6; s.renderOrder=3; FX.group.add(s);
   const dist=pos.distanceTo(ship.pos); const pct=THREE.MathUtils.clamp(1-dist/1000,0,1);
   if(pct>0){ addShake(0.6*pct, 0.25+0.2*pct); AUD.boom(); screenFlash(0.12*pct); triggerKick(1.2*pct); }
 }
-window.spawnexplosion = spawnExplosion; // safety alias
 function createLaserBeam(start,end){
   const dir=end.clone().sub(start), len=Math.max(0.001,dir.length()), dirN=dir.clone().normalize();
+  // Materials: draw on top to avoid first-frame occlusion; renderOrder higher than asteroids
+  const mCore=new THREE.MeshBasicMaterial({color:0x88ccff,transparent:true,opacity:0.95,blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false});
+  const mGlow=new THREE.MeshBasicMaterial({color:0x66aaff,transparent:true,opacity:0.35,blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false});
+
   const gCore=new THREE.CylinderGeometry(1.3,1.3,1,18,1,true);
-  const mCore=new THREE.MeshBasicMaterial({color:0x88ccff,transparent:true,opacity:0.95,blending:THREE.AdditiveBlending,depthWrite:false});
-  const core=new THREE.Mesh(gCore,mCore);
   const gGlow=new THREE.CylinderGeometry(2.6,2.6,1,18,1,true);
-  const mGlow=new THREE.MeshBasicMaterial({color:0x66aaff,transparent:true,opacity:0.35,blending:THREE.AdditiveBlending,depthWrite:false});
+  const core=new THREE.Mesh(gCore,mCore);
   const glow=new THREE.Mesh(gGlow,mGlow);
   const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),dirN);
   core.quaternion.copy(q); glow.quaternion.copy(q);
-  core.frustumCulled=false; glow.frustumCulled=false;
-  const startSprite=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexBlue,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:0.95}));
-  const endSprite  =new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexBlue,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:0.95}));
+  core.frustumCulled=false; glow.frustumCulled=false; core.renderOrder=3; glow.renderOrder=3;
+
+  const startSprite=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexBlue,transparent:true,depthWrite:false,depthTest:false,blending:THREE.AdditiveBlending,opacity:0.95}));
+  const endSprite  =new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexBlue,transparent:true,depthWrite:false,depthTest:false,blending:THREE.AdditiveBlending,opacity:0.95}));
   startSprite.scale.set(7,7,1); endSprite.scale.set(9,9,1);
-  startSprite.frustumCulled=false; endSprite.frustumCulled=false;
+  startSprite.frustumCulled=false; endSprite.frustumCulled=false; startSprite.renderOrder=3; endSprite.renderOrder=3;
+
+  // Pre-place immediately (so first frame shows correctly)
+  const mid0 = start.clone().addScaledVector(dirN, 0.001);
+  core.position.copy(mid0); glow.position.copy(mid0);
+  core.scale.set(1,0.001,1); glow.scale.set(1,0.001,1);
+  startSprite.position.copy(start); endSprite.position.copy(start);
+
   scene.add(core,glow,startSprite,endSprite);
   return {start:start.clone(),dir:dirN,len,mesh:core,outer:glow,startGlow:startSprite,endGlow:endSprite,t:0,life:0.22,growTime:0.06};
 }
@@ -821,10 +806,13 @@ function removeBeam(b){
 function triggerKick(k){ fovKick=Math.min(4, fovKick + k); }
 function screenFlash(a){ flashAmt=Math.min(1, flashAmt+a); }
 
-/* Crits + lock */
-const FIRST_HIT=new Map();
-let critT=0;
-function getReticleRay(){ const origin=camera.position.clone(); const dir=new THREE.Vector3(); camera.getWorldDirection(dir); return {origin,dir}; }
+/* Aim ray — make sure matrices are fresh before first shot */
+function getReticleRay(){
+  camera.updateMatrixWorld(true);
+  const origin=camera.position.clone();
+  const dir=new THREE.Vector3(); camera.getWorldDirection(dir);
+  return {origin,dir};
+}
 function rayHitAsteroids(origin,dir,maxRange){
   let bestT=Infinity,best=null;
   for(const a of AST.data){ if(!a.alive) continue;
@@ -838,33 +826,37 @@ function rayHitAsteroids(origin,dir,maxRange){
 function fireLaser(){
   const L=ship.laser; if(L.over||L._cd>0) return; L.heat+=L.shotHeat; if(L.heat>=100){ L.over=true; toast('Laser overheated!'); }
   L._cd=1/Math.max(3,ship.laser.rof);
-  const {origin,dir}=getReticleRay(); const pick=rayHitAsteroids(origin,dir,ship.range); const endPoint=pick.point.clone();
+
+  // Use fresh matrices for the very first shot
+  const {origin,dir}=getReticleRay();
+  const pick=rayHitAsteroids(origin,dir,ship.range); const endPoint=pick.point.clone();
+
   const startL=hardpointWorld(HP_LOCAL.laserL), startR=hardpointWorld(HP_LOCAL.laserR);
-  LASER_BEAMS.push(createLaserBeam(startL,endPoint)); LASER_BEAMS.push(createLaserBeam(startR,endPoint));
+  const bL=createLaserBeam(startL,endPoint), bR=createLaserBeam(startR,endPoint);
+  // Ensure initial placement before the renderer’s next pass
+  updateBeam(bL, bL.growTime*0.01); updateBeam(bR, bR.growTime*0.01);
+  LASER_BEAMS.push(bL,bR);
+
   triggerKick(1.1); screenFlash(0.08); AUD.zap();
+
   if(pick.hit){
-    const r=pick.rock; const id=r.id;
-    if(!FIRST_HIT.has(id)) FIRST_HIT.set(id, gameTime);
-    r.hp-=ship.laser.dmg; if(Math.random()<0.35){ const p=pick.point; const chip=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexBlue,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.85})); chip.position.copy(p); chip.scale.set(3.4,3.4,1); chip.userData.t=0; chip.userData.life=0.45; FX.group.add(chip); }
-    if(r.hp<=0){
-      const timeCrit=(gameTime-(FIRST_HIT.get(id)||gameTime))<=0.25; const rangeCrit=pick.t>ship.range*0.90;
-      if(timeCrit||rangeCrit){ critT=0.20; AUD.beep(2200,0.05,'triangle',0.04); }
-      destroyAsteroid(r); FIRST_HIT.delete(id);
-    }
+    const r=pick.rock; r.hp-=ship.laser.dmg;
+    if(Math.random()<0.35){ const p=pick.point; const chip=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexBlue,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false,opacity:0.85})); chip.position.copy(p); chip.scale.set(3.4,3.4,1); chip.userData.t=0; chip.userData.life=0.45; chip.renderOrder=3; FX.group.add(chip); }
+    if(r.hp<=0) destroyAsteroid(r);
   }
 }
-/* Missile speed floor: ≥ 2× ship.maxSpeed, inherit ship vel */
+/* Missile speed floor: inherit ship velocity and be fast */
 function missileBaseSpeed(){ return Math.max(2*ship.maxSpeed, 600); }
 function fireMissile(){
   const M=ship.missile; if(M.over||M._cd>0) return; M.heat+=M.shotHeat; if(M.heat>=100){ M.over=true; toast('Missiles overheated!'); }
-  M._cd=M.reload; const {dir}=getReticleRay(); spawnMissile(dir, LOCK.locked?0.3:0.0);
+  M._cd=M.reload; const {dir}=getReticleRay(); spawnMissile(dir, 0.3);
   triggerKick(1.6); screenFlash(0.06);
 }
 function spawnMissile(dir, lockBoost=0.0){
   const nose=hardpointWorld(HP_LOCAL.missile);
-  const core=new THREE.Mesh(new THREE.SphereGeometry(0.7,14,12), new THREE.MeshBasicMaterial({color:0xffcc88,transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false}));
-  const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexOrange,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.9}));
-  glow.scale.set(7,7,1); const group=new THREE.Group(); group.add(glow,core); group.position.copy(nose); scene.add(group);
+  const core=new THREE.Mesh(new THREE.SphereGeometry(0.7,14,12), new THREE.MeshBasicMaterial({color:0xffcc88,transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false}));
+  const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexOrange,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false,opacity:0.9}));
+  glow.scale.set(7,7,1); const group=new THREE.Group(); group.add(glow,core); group.position.copy(nose); group.renderOrder=3; scene.add(group);
   const base=missileBaseSpeed();
   const v0 = dir.clone().multiplyScalar(base).add(ship.vel.clone());
   MISSILES.push({pos:nose.clone(),vel:v0,life:10,mesh:group,trailT:0,lockBoost,base});
@@ -882,18 +874,11 @@ function updateMissiles(dt){
     if(m.lockBoost>0) m.lockBoost=Math.max(0, m.lockBoost-dt);
 
     m.pos.addScaledVector(m.vel,dt); m.mesh.position.copy(m.pos); m.life-=dt;
-    m.trailT=(m.trailT||0)+dt; if(m.trailT>0.03){ m.trailT=0; const s=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexOrange,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.8})); s.position.copy(m.pos); s.scale.set(5,5,1); s.userData.t=0; s.userData.life=0.35; FX.group.add(s); }
+    m.trailT=(m.trailT||0)+dt; if(m.trailT>0.03){ m.trailT=0; const s=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexOrange,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false,opacity:0.8})); s.position.copy(m.pos); s.scale.set(5,5,1); s.userData.t=0; s.userData.life=0.35; s.renderOrder=3; FX.group.add(s); }
     let hit=null; for(const a of AST.data){ if(!a.alive) continue; const dx=m.pos.x-a.x,dy=m.pos.y-a.y,dz=m.pos.z-a.z,r=a.size*1.15; if(dx*dx+dy*dy+dz*dz<=r*r){ hit=a; break; } }
     if(hit){ hit.hp-=ship.missile.dmg; if(hit.hp<=0) destroyAsteroid(hit); spawnExplosion(m.pos,2.4); scene.remove(m.mesh); MISSILES.splice(i,1); }
     else if(m.life<=0){ scene.remove(m.mesh); MISSILES.splice(i,1); }
   }
-}
-function destroyAsteroid(rec){
-  if(!rec.alive) return; rec.alive=false;
-  const inst=AST.inst[rec.gi], m=new THREE.Matrix4();
-  m.compose(new THREE.Vector3(999999,999999,999999),new THREE.Quaternion(),new THREE.Vector3(0.0001,0.0001,0.0001));
-  inst.setMatrixAt(rec.idx,m); inst.instanceMatrix.needsUpdate=true;
-  addDropsOnDestroy(rec); spawnExplosion(new THREE.Vector3(rec.x,rec.y,rec.z),rec.size);
 }
 
 /* ---------- Station ---------- */
@@ -983,8 +968,13 @@ function updateNavHUD(worldPos,dt){
   const v = worldPos.clone().project(camera);
   let ndcX=v.x, ndcY=v.y;
   const onScreen = !behind && Math.abs(ndcX)<=1 && Math.abs(ndcY)<=1;
-  if(behind){ ndcX=-ndcX; ndcY=-ndcY; const m=Math.max(Math.abs(ndcX),Math.abs(ndcY),1e-6); ndcX/=m; ndcY/=m; ndcX=clamp(ndcX,-1+padNdcX,1-padNdcX); ndcY=clamp(ndcY,-1+padNdcY,1-padNdcY); }
-  else if(!onScreen){ ndcX=clamp(ndcX,-1+padNdcX,1-padNdcX); ndcY=clamp(ndcY,-1+padNdcY,1-padNdcY); }
+  if(behind){
+    ndcX=-ndcX; ndcY=-ndcY; const m=Math.max(Math.abs(ndcX),Math.abs(ndcY),1e-6); ndcX/=m; ndcY/=m;
+    ndcX=clamp(ndcX,-1+padNdcX,1-padNdcX); ndcY=clamp(ndcY,-1+padNdcY,1-padNdcY);
+  }
+  else if(!onScreen){
+    ndcX=clamp(ndcX,-1+padNdcX,1-padNdcX); ndcY=clamp(ndcY,-1+padNdcY,1-padNdcY);
+  }
   const targetX = ((onScreen?v.x:ndcX)*0.5+0.5)*w;
   const targetY = (-(onScreen?v.y:ndcY)*0.5+0.5)*h;
   const alpha = 1 - Math.pow(0.001, dt*60*0.9);
@@ -996,7 +986,7 @@ function updateNavHUD(worldPos,dt){
   const ang=Math.atan2(NAV.py-h/2, NAV.px-w/2) + Math.PI/2; ui.navArrow.style.transform=`rotate(${ang}rad)`;
 }
 
-/* ---------- Comets + Traffic ---------- */
+/* ---------- Comets + Traffic + Gas ---------- */
 const COMETS=[]; let cometTimer=1.5; // early guaranteed
 function spawnComet(){
   const start = ship.pos.clone().add(new THREE.Vector3((Math.random()-0.5)*3000,(Math.random()-0.5)*1000,-5000));
@@ -1025,7 +1015,7 @@ function buildTraffic(){
   const inst=new THREE.InstancedMesh(geo,mat,cap);
   inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   inst.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(cap*3),3);
-  inst.count=0; TRAFFIC.mesh=inst; TRAFFIC.group.add(inst); TRAFFIC.active.length=0; TRAFFIC.spawnT=0.2; // show early
+  inst.count=0; TRAFFIC.mesh=inst; TRAFFIC.group.add(inst); TRAFFIC.active.length=0; TRAFFIC.spawnT=0.2;
 }
 function spawnTraffic(){
   if(TRAFFIC.active.length>=TRAFFIC.cap) return;
@@ -1054,10 +1044,10 @@ let boostingNow=false, trailShipT=0;
 function updateShipContrail(dt){
   if(boostingNow && ship.vel.length()>60){
     trailShipT+=dt; if(trailShipT>0.04){ trailShipT=0;
-      const s=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexBlue,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.6}));
+      const s=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexBlue,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false,opacity:0.6}));
       const back=new THREE.Vector3(0,0,1).applyQuaternion(ship.quat);
       s.position.copy(ship.pos).addScaledVector(back,2.2);
-      s.scale.set(4.5,4.5,1); s.userData.t=0; s.userData.life=0.42; FX.group.add(s);
+      s.scale.set(4.5,4.5,1); s.userData.t=0; s.userData.life=0.42; s.renderOrder=3; FX.group.add(s);
     }
   }
 }
@@ -1069,11 +1059,11 @@ let retTmr=0, retHit=false, currentTarget=null;
 const LOCK={ id:null, t:0, locked:false, beeped:false };
 function ensureTargetVisual(){
   if(ensureTargetVisual.g) return; const ringGeo=new THREE.RingGeometry(0.92,1.03,64);
-  const ringMat=new THREE.MeshBasicMaterial({color:0x68ffb0, transparent:true, opacity:0.85, blending:THREE.AdditiveBlending, depthWrite:false});
+  const ringMat=new THREE.MeshBasicMaterial({color:0x68ffb0, transparent:true, opacity:0.85, blending:THREE.AdditiveBlending, depthWrite:false,depthTest:false});
   const ring=new THREE.Mesh(ringGeo, ringMat);
   const fillGeo=new THREE.CircleGeometry(0.92,48);
-  const fillMat=new THREE.MeshBasicMaterial({color:0x68ffb0, transparent:true, opacity:0.12, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide});
-  const fill=new THREE.Mesh(fillGeo, fillMat); const g=new THREE.Group(); g.add(fill,ring); g.visible=false; g.renderOrder=2; scene.add(g); ensureTargetVisual.g=g;
+  const fillMat=new THREE.MeshBasicMaterial({color:0x68ffb0, transparent:true, opacity:0.12, blending:THREE.AdditiveBlending, depthWrite:false,depthTest:false, side:THREE.DoubleSide});
+  const fill=new THREE.Mesh(fillGeo, fillMat); const g=new THREE.Group(); g.add(fill,ring); g.visible=false; g.renderOrder=3; scene.add(g); ensureTargetVisual.g=g;
 }
 function showTarget(rock){
   ensureTargetVisual();
@@ -1089,8 +1079,7 @@ function showTarget(rock){
 function updateScreenFX(dt){
   retTmr-=dt; if(retTmr<=0){ retTmr=0.05; const {origin,dir}=getReticleRay(); const pick=rayHitAsteroids(origin,dir,ship.range); retHit=pick.hit; currentTarget=pick.hit?pick.rock:null; showTarget(currentTarget); }
   const root=document.documentElement.style;
-  if(critT>0){ critT-=dt; root.setProperty('--ret','rgba(120,255,180,.98)'); root.setProperty('--retGlow','rgba(120,255,180,.75)'); root.setProperty('--retGlow2','rgba(120,255,180,.55)'); root.setProperty('--retScale','1.22'); }
-  else if(retHit){ root.setProperty('--ret','rgba(120,255,180,.95)'); root.setProperty('--retGlow','rgba(120,255,180,.65)'); root.setProperty('--retGlow2','rgba(120,255,180,.45)'); root.setProperty('--retScale','1.08'); }
+  if(retHit){ root.setProperty('--ret','rgba(120,255,180,.95)'); root.setProperty('--retGlow','rgba(120,255,180,.65)'); root.setProperty('--retGlow2','rgba(120,255,180,.45)'); root.setProperty('--retScale','1.08'); }
   else { root.setProperty('--ret','rgba(173,216,255,.9)'); root.setProperty('--retGlow','rgba(120,180,255,.55)'); root.setProperty('--retGlow2','rgba(120,180,255,.35)'); root.setProperty('--retScale','1'); }
   const fovDecay=document.body.classList.contains('photo')?2.2:6.0;
   fovKick = lerp(fovKick, 0, Math.min(1, dt*fovDecay)); camera.fov = baseFov + fovKick; camera.updateProjectionMatrix();
@@ -1115,7 +1104,6 @@ function handleInput(dt){
   let pitch=((keys['KeyW']?1:0)-(keys['KeyS']?1:0))*ship.pitchRate*dt;
   let roll=((keys['KeyQ']?1:0)-(keys['KeyE']?1:0))*ship.rollRate*dt;
 
-  // Gamepad sticks: add
   if(Settings.mouseAim && MOUSE.locked){ yaw += MOUSE.yaw; pitch += MOUSE.pitch; MOUSE.yaw=0; MOUSE.pitch=0; }
   roll += (PAD.roll||0)*ship.rollRate*dt*0.6;
 
@@ -1128,41 +1116,33 @@ function handleInput(dt){
   const up =new THREE.Vector3(0,1,0).applyQuaternion(ship.quat);
   const right=new THREE.Vector3(1,0,0).applyQuaternion(ship.quat);
 
-  // Inputs
   const thrustF=(keys['ArrowUp']?1:0)-(keys['ArrowDown']?1:0);
   const thrustX=(keys['ArrowRight']?1:0)-(keys['ArrowLeft']?1:0) + (PAD.strafeX||0);
   const thrustY=(keys['KeyR']?1:0)-(keys['KeyF']?1:0) + (PAD.liftDigital||0) + (PAD.lift||0)*0.9;
 
-  // Throttle smoothing
   ship.throttle = lerp(ship.throttle, ship.throttleTarget, 0.08);
 
-  // Boost / Brake (keyboard + pad)
   boostingNow = ((keys['ShiftLeft']||keys['ShiftRight']) || PAD.boost) && (ship.boost.val>0.01);
   const braking = (keys['KeyZ'] || PAD.brake);
   const mult = boostingNow ? ship.boost.mult : 1.0;
   if(boostingNow){ ship.boost.val = Math.max(0, ship.boost.val - dt); triggerKick(0.3); }
   else { ship.boost.val = Math.min(ship.boost.cap, ship.boost.val + ship.boost.regen*dt); }
 
-  // Apply forces
   const forwardInput = clamp(thrustF + ship.throttle, -1, 1);
   ship.vel.addScaledVector(fwd,forwardInput*ship.thrust*mult*dt);
   ship.vel.addScaledVector(right,thrustX*ship.strafe*mult*dt);
   ship.vel.addScaledVector(up,thrustY*ship.lift*mult*dt);
 
-  // Damp / brake
   if(braking) ship.vel.multiplyScalar(Math.pow(1-ship.brakeCoeff,dt*60));
   else {
-    // stronger general damping + assist when not throttling
     ship.vel.multiplyScalar(1-ship.dampingLin*dt);
     if(Math.abs(forwardInput)<0.05 && Math.abs(thrustX)<0.05 && Math.abs(thrustY)<0.05){
       ship.vel.multiplyScalar(1-0.06*dt); // assist stop
     }
   }
 
-  // Speed clamp per boost state
   const spd=ship.vel.length(); const maxSpd=ship.maxSpeed*mult; if(spd>maxSpd) ship.vel.multiplyScalar(maxSpd/spd);
 
-  // Fire (no latch)
   const padL=PAD.fireL, padR=PAD.fireR;
   if(keys['Space'] || MOUSE.fireL || padL) fireLaser();
   if(keys['KeyX']  || MOUSE.fireR || padR) fireMissile();
@@ -1170,23 +1150,52 @@ function handleInput(dt){
   if(keys['KeyC'] && docked){ closeDockPanel(); }
 }
 
-/* ---------- Drops update (bigger magnet) ---------- */
+/* ---------- Drops update — SUPER magnet (range, speed, lead, match) ---------- */
+const MAGCFG = {
+  base: 140,        // baseline pull
+  perLv: 30,        // extra per magnet upgrade
+  speedBoost: 0.8,  // adds with your ship speed
+  velAssist: 0.85,  // velocity matching strength (lerp factor)
+  strongRange: 280, // strong vacuum distance (≈ few ship lengths)
+  strongK: 460,     // strong pull strength
+  rangeMult: 3.0,   // global range multiplier
+  pickupBase: 10,
+  pickupScale: 0.85
+};
 function updateDrops(dt){
   if(STREAK.time>0){ STREAK.time-=dt; if(STREAK.time<=0) resetStreak(); }
+  const playerSpd = ship.vel.length();
   for(let i=0;i<DROPS.count;i++){
     const d=DROPS.data[i]; if(!d||!d.alive) continue;
+    // Passive motion
     d.pos.addScaledVector(d.vel,dt); d.vel.multiplyScalar(0.992);
     d.flare && (d.flare.position.copy(d.pos), d.flare.scale.setScalar(Math.min(32,d.scale*1.8)));
-    const toShip=ship.pos.clone().sub(d.pos); const dist=toShip.length();
 
-    // Base magnet increased substantially; strong attractor when close
-    const baseMag = 80 + (upgrades.magnet-1)*18;
-    const strongRange = 160; // ~couple ship lengths as "vacuum"
-    const range = baseMag + d.scale*8.0;
-    if(dist<range){ d.vel.add(toShip.normalize().multiplyScalar(((baseMag*1.2)+d.scale)*dt)); }
-    if(dist<strongRange){ d.vel.add(toShip.normalize().multiplyScalar(200*dt)); } // strong suck‑in
+    // Magnet calculations
+    const toShip = ship.pos.clone().sub(d.pos); const dist = toShip.length();
+    const baseMag = (MAGCFG.base + (upgrades.magnet-1)*MAGCFG.perLv) * (1 + 0.005*playerSpd);
+    const range   = (baseMag*MAGCFG.rangeMult) + d.scale*10;
 
-    const pickupR = 10 + d.scale*0.8;
+    if(dist<range){
+      // Predict where you'll be soon and aim there
+      const leadTime = clamp(dist / Math.max(120, playerSpd+1), 0, 0.6);
+      const futureShip = ship.pos.clone().addScaledVector(ship.vel, leadTime);
+      const leadDir = futureShip.sub(d.pos).normalize();
+
+      // Accelerate toward lead point
+      const accel = (baseMag + d.scale*12)*dt;
+      d.vel.addScaledVector(leadDir, accel);
+
+      // Velocity matching to help catch fast player
+      d.vel.lerp(ship.vel, MAGCFG.velAssist*dt);
+
+      // Strong close vacuum
+      if(dist<MAGCFG.strongRange){
+        d.vel.addScaledVector(leadDir, MAGCFG.strongK*dt);
+      }
+    }
+
+    const pickupR = MAGCFG.pickupBase + d.scale*MAGCFG.pickupScale;
     if(dist<pickupR){
       d.alive=false;
       const prevLevel=STREAK.level; STREAK.count++; STREAK.time=2.2; STREAK.level=Math.floor(STREAK.count/3);
